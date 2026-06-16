@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+
+    "module": "CommonJS",
+    "target": "ES2020",
+
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+
+    "esModuleInterop": true,
+    "strict": true,
+
+    "jsx": "react-jsx",
+    "types": ["node"],
+
+    "isolatedModules": true,
+    "noUncheckedSideEffectImports": true,
+
+    "moduleResolution": "node",
+    "skipLibCheck": true,
+
+    "ignoreDeprecations": "6.0"
+
+    
+  },
+  "include": ["src/**/*", "prisma.config.ts"],
+  "exclude": ["node_modules"]
+}

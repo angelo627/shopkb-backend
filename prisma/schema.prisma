@@ -1,0 +1,174 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  //url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+ ADMIN
+SUPERADMIN
+ STAFF
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+enum BusinessDayStatus {
+ OPEN
+ CLOSED
+}
+
+enum MovementType {
+ IN
+ OUT
+}
+
+enum MovementReason {
+ STOCK_RECEIVED
+ SALE
+ ADJUSTMENT
+}
+
+User
+model User {
+ id           String   @id @default(uuid())
+ fullName     String
+ email        String   @unique
+ passwordHash String
+
+ role         UserRole
+ status       UserStatus @default(PENDING)
+
+ sales        Sale[]
+ movements    StockMovement[]
+ activities   ActivityLog[]
+
+ openedDays   BusinessDay[] @relation("OpenedBy")
+ closedDays   BusinessDay[] @relation("ClosedBy")
+
+ createdAt    DateTime @default(now())
+ updatedAt    DateTime @updatedAt
+}
+
+Product
+model Product {
+ id            String   @id @default(uuid())
+
+ name          String
+ description   String?
+ imageUrl      String?
+
+ sellingPrice  Decimal  @db.Decimal(12, 2)
+
+ stockQuantity Int      @default(0)
+
+ sales         Sale[]
+ movements     StockMovement[]
+
+ createdAt     DateTime @default(now())
+ updatedAt     DateTime @updatedAt
+}
+
+BusinessDay
+model BusinessDay {
+ id            String @id @default(uuid())
+
+ businessDate  DateTime @unique
+
+ status        BusinessDayStatus @default(OPEN)
+
+ openedById    String?
+ openedBy      User? @relation("OpenedBy", fields: [openedById], references: [id])
+
+ closedById    String?
+ closedBy      User? @relation("ClosedBy", fields: [closedById], references: [id])
+
+ sales         Sale[]
+ movements     StockMovement[]
+ activities    ActivityLog[]
+
+ openedAt      DateTime @default(now())
+ closedAt      DateTime?
+
+ createdAt     DateTime @default(now())
+}
+
+Sale
+model Sale {
+ id             String @id @default(uuid())
+
+ productId      String
+ product        Product @relation(fields: [productId], references: [id])
+
+ soldById       String
+ soldBy         User @relation(fields: [soldById], references: [id])
+
+ businessDayId  String
+ businessDay    BusinessDay @relation(fields: [businessDayId], references: [id])
+
+ quantity       Int
+
+ unitPrice      Decimal @db.Decimal(12, 2)
+
+ totalAmount    Decimal @db.Decimal(12, 2)
+
+ createdAt      DateTime @default(now())
+
+ @@index([businessDayId])
+ @@index([productId])
+}
+
+StockMovement
+model StockMovement {
+ id             String @id @default(uuid())
+
+ productId      String
+ product        Product @relation(fields: [productId], references: [id])
+
+ userId         String
+ user           User @relation(fields: [userId], references: [id])
+
+ businessDayId  String
+ businessDay    BusinessDay @relation(fields: [businessDayId], references: [id])
+
+ movementType   MovementType
+
+ reason         MovementReason
+
+ quantity       Int
+
+ notes          String?
+
+ createdAt      DateTime @default(now())
+
+ @@index([businessDayId])
+ @@index([productId])
+}
+
+ActivityLog
+model ActivityLog {
+ id             String @id @default(uuid())
+
+ userId         String
+ user           User @relation(fields: [userId], references: [id])
+
+ businessDayId  String
+ businessDay    BusinessDay @relation(fields: [businessDayId], references: [id])
+
+ action         String
+
+ details        String?
+
+ createdAt      DateTime @default(now())
+
+ @@index([businessDayId])
+ @@index([userId])
+}
