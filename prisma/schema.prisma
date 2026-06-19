@@ -10,7 +10,7 @@ datasource db {
 
 enum UserRole {
  ADMIN
-SUPERADMIN
+ SUPERADMIN
  STAFF
 }
 
@@ -37,7 +37,6 @@ enum MovementReason {
  ADJUSTMENT
 }
 
-User
 model User {
  id           String   @id @default(uuid())
  fullName     String
@@ -58,7 +57,6 @@ model User {
  updatedAt    DateTime @updatedAt
 }
 
-Product
 model Product {
  id            String   @id @default(uuid())
 
@@ -77,7 +75,6 @@ model Product {
  updatedAt     DateTime @updatedAt
 }
 
-BusinessDay
 model BusinessDay {
  id            String @id @default(uuid())
 
@@ -101,7 +98,6 @@ model BusinessDay {
  createdAt     DateTime @default(now())
 }
 
-Sale
 model Sale {
  id             String @id @default(uuid())
 
@@ -126,7 +122,6 @@ model Sale {
  @@index([productId])
 }
 
-StockMovement
 model StockMovement {
  id             String @id @default(uuid())
 
@@ -153,7 +148,6 @@ model StockMovement {
  @@index([productId])
 }
 
-ActivityLog
 model ActivityLog {
  id             String @id @default(uuid())
 
