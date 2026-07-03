@@ -8,14 +8,14 @@ async function startServer(): Promise<void> {
   try {
     // Connect to the database
     await prisma.$connect();
-    console.log("✅ Connected to PostgreSQL through Prisma.");
+    console.log(" Connected to PostgreSQL through Prisma.");
 
     // Start the Express server
     const server = app.listen(env.port, () => {
       const baseUrl = env.appBaseUrl.replace(/\/$/, "");
 
-      console.log(`🚀 Server is running on port ${env.port}`);
-      console.log(`🌐 API Base URL: ${baseUrl}`);
+      console.log(` Server is running on port ${env.port}`);
+      console.log(` API Base URL: ${baseUrl}`);
     });
 
     // Handle server startup errors
@@ -35,13 +35,13 @@ async function startServer(): Promise<void> {
     // Graceful shutdown
     const shutdown = (signal: string): void => {
       if (shuttingDown) {
-        console.log("⚠️ Shutdown already in progress...");
+        console.log(" Shutdown already in progress...");
         return;
       }
 
       shuttingDown = true;
 
-      console.log(`⚠️ Received ${signal}. Shutting down gracefully...`);
+      console.log(` Received ${signal}. Shutting down gracefully...`);
 
       server.close(() => {
         void disconnectDatabase().finally(() => {
@@ -54,7 +54,7 @@ async function startServer(): Promise<void> {
     process.on("SIGTERM", () => shutdown("SIGTERM"));
 
   } catch (error) {
-    console.error("❌ Failed to start server:", error);
+    console.error(" Failed to start server:", error);
 
     await disconnectDatabase();
     process.exit(1);
@@ -65,9 +65,9 @@ async function startServer(): Promise<void> {
 async function disconnectDatabase(): Promise<void> {
   try {
     await prisma.$disconnect();
-    console.log("✅ Database disconnected.");
+    console.log(" Database disconnected.");
   } catch (error) {
-    console.error("❌ Error while disconnecting Prisma:", error);
+    console.error(" Error while disconnecting Prisma:", error);
   }
 }
 

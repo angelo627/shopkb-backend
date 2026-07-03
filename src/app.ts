@@ -1,5 +1,7 @@
 import express from "express";
 import cors from "cors";
+import routes from "./routes";
+import {responseFormatter} from "./middlewares/response-formatter"
 
 export const app = express();
 
@@ -16,5 +18,7 @@ app.get("/health", (_req, res) => {
 
 // Routes will go here later
 // app.use("/api", routes);
+app.use("/api", routes);
+app.use(responseFormatter);
 
 export default app;
