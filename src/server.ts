@@ -22,10 +22,10 @@ async function startServer(): Promise<void> {
     server.on("error", async (error: NodeJS.ErrnoException) => {
       if (error.code === "EADDRINUSE") {
         console.error(
-          `❌ Port ${env.port} is already in use. Update PORT in .env and retry.`
+          ` Port ${env.port} is already in use. Update PORT in .env and retry.`
         );
       } else {
-        console.error("❌ Server failed to start:", error);
+        console.error(" Server failed to start:", error);
       }
 
       await disconnectDatabase();

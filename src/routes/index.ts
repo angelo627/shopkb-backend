@@ -1,16 +1,36 @@
 import { Router } from "express";
 
 import { authRouter } from "../modules/auth/auth.routes";
+import { authenticate, authorize } from "../middlewares/auth.middleware"
 
-const router = Router();
+const Apirouter = Router();
+const adminrouter = Router();
 
-router.get("/health", (_req, res) => {
+Apirouter.get("/health", (_req, res) => {
   res.status(200).json({
     success: true,
     message: "Server is healthy.",
   });
 });
 
-router.use("/auth", authRouter);
 
-export default router;
+
+// all routes -public
+Apirouter.use("/auth", authRouter);
+
+
+
+// protected routes for users etc
+Apirouter.use(authenticate);
+
+
+
+//all adminroutes 
+adminrouter.use(authorize("ADMIN", "SUPERADMIN"));
+adminrouter.use("/")
+
+
+// adminrouter linked to apirouter
+Apirouter.use("/admin", adminrouter)
+
+export default Apirouter;
