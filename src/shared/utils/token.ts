@@ -1,5 +1,4 @@
 import jwt from "jsonwebtoken";
-
 import { env } from "../../config/env";
 import { UserRole, UserStatus } from "../constants/auth";
 
@@ -8,15 +7,15 @@ export interface AccessTokenPayload {
   email: string;
   role: UserRole;
   status: UserStatus;
-//   sessionId: string;
+  sessionId: string;
   type: "access";
 } 
 
-// export interface RefreshTokenPayload {
-//   sub: string;
-//   sessionId: string;
-//   type: "refresh";
-// }
+export interface RefreshTokenPayload {
+  sub: string;
+  sessionId: string;
+  type: "refresh";
+}
 
 //Generate an Access Token.
 export function signAccessToken(
@@ -35,21 +34,21 @@ export function signAccessToken(
 }
 
 
-//Generate a Refresh Token.
-// export function generateRefreshToken(
-//   payload: Omit<RefreshTokenPayload, "type">
-// ): string {
-//   return jwt.sign(
-//     {
-//       ...payload,
-//       type: "refresh",
-//     },
-//     env.refreshTokenSecret,
-//     {
-//       expiresIn: `${env.refreshTokenTtlDays}d`,
-//     }
-//   );
-// }
+// Generate a Refresh Token.
+export function generateRefreshToken(
+  payload: Omit<RefreshTokenPayload, "type">
+): string {
+  return jwt.sign(
+    {
+      ...payload,
+      type: "refresh",
+    },
+    env.refreshTokenSecret,
+    {
+      expiresIn: `${env.refreshTokenTtlDays}d`,
+    }
+  );
+}
 
 //Verify an Access Token.
 export function verifyAccessToken(token: string): AccessTokenPayload {
@@ -65,16 +64,16 @@ export function verifyAccessToken(token: string): AccessTokenPayload {
   return payload;
 }
 
-//Verify a Refresh Token.
-// export function verifyRefreshToken(token: string): RefreshTokenPayload {
-//   const payload = jwt.verify(
-//     token,
-//     env.refreshTokenSecret
-//   ) as RefreshTokenPayload;
+// Verify a Refresh Token.
+export function verifyRefreshToken(token: string): RefreshTokenPayload {
+  const payload = jwt.verify(
+    token,
+    env.refreshTokenSecret
+  ) as RefreshTokenPayload;
 
-//   if (payload.type !== "refresh") {
-//     throw new Error("Invalid refresh token type.");
-//   }
+  if (payload.type !== "refresh") {
+    throw new Error("Invalid refresh token type.");
+  }
 
-//   return payload;
-// }
+  return payload;
+}

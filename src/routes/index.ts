@@ -16,7 +16,7 @@ Apirouter.get("/health", (_req, res) => {
 
 
 // all routes -public
-Apirouter.use("/auth", authRouter);
+Apirouter.use("/auth", authRouter); // for login and signup from auths
 
 
 
@@ -27,7 +27,7 @@ Apirouter.use(authenticate);
 
 //all adminroutes 
 adminrouter.use(authorize("ADMIN", "SUPERADMIN"));
-adminrouter.use("/")
+// adminrouter.use("/")
 
 
 // adminrouter linked to apirouter

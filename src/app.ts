@@ -5,6 +5,7 @@ import mainApiRoutes from "./routes/index"
 import {responseFormatter} from "./middlewares/response-formatter"
 import {notFound} from "./middlewares/not-found"
 import {globalErrorHandler} from "./middlewares/error-handler"
+import cookieParser from "cookie-parser";
 
 export const app = express();
 
@@ -17,9 +18,11 @@ app.use(
 );
 
 app.use(express.json({ limit: "1mb" }));
+app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 app.disable("x-powered-by");
 app.use(responseFormatter);
+
 
 app.get("/health", (_req, res) => {
   res.status(200).json({

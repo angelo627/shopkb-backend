@@ -45,6 +45,8 @@ model User {
  role         UserRole
  status       UserStatus @default(PENDING)
 
+ sessions     Session[]
+
  sales        Sale[]
  movements    StockMovement[]
  activities   ActivityLog[]
@@ -54,6 +56,33 @@ model User {
 
  createdAt    DateTime @default(now())
  updatedAt    DateTime @updatedAt
+}
+
+model Session {
+  id                 String   @id @default(uuid())
+
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  refreshTokenHash   String
+
+  tokenVersion       Int      @default(1)
+
+  expiresAt          DateTime
+
+  lastUsedAt         DateTime?
+
+  revokedAt          DateTime?
+
+  ipAddress          String?
+
+  userAgent          String?
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model Product {

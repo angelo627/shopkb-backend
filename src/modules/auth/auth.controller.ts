@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 
 import { authService } from "./auth.service";
 import { asyncHandler } from "../../shared/utils/async-handler";
+import { setRefreshTokenCookie } from "../../shared/utils/cookies";
 
 export const authController = {
   register: asyncHandler(async (req: Request, res: Response) => {
@@ -15,12 +16,21 @@ export const authController = {
   }),
 
   login: asyncHandler(async (req: Request, res: Response) => {
-    const result = await authService.login(req.body);
+    const result = await authService.login(req.body, {
+      userAgent: req.get("user-agent") ?? undefined,
+      ipAddress: req.ip,
+    });
+
+    // Store the refresh token in an HttpOnly cookie
+    setRefreshTokenCookie(res, result.refreshToken);
+
+    // Remove the refresh token from the response body
+    const { refreshToken, ...data } = result;
 
     res.status(200).json({
       success: true,
       message: "Login successful.",
-      data: result,
+      data,
     });
   }),
 

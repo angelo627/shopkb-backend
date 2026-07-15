@@ -7,6 +7,7 @@ import {
   AccessTokenPayload,
   signAccessToken,
 } from "../../shared/utils/token";
+import { sessionService } from "../sessions/session.service";
 
 export interface RegisterInput {
   fullName: string;
@@ -20,6 +21,11 @@ export interface LoginInput {
   password: string;
 }
 
+export interface LoginContext {
+  userAgent?: string | undefined;
+  ipAddress?: string | undefined;
+}
+
 export interface AuthenticatedUser {
   id: string;
   fullName: string;
@@ -31,6 +37,7 @@ export interface AuthenticatedUser {
 export interface AuthenticationResult {
   user: AuthenticatedUser;
   accessToken: string;
+  refreshToken: string;
 }
 
 const INVALID_CREDENTIALS_MESSAGE = "Invalid email or password.";
@@ -103,14 +110,14 @@ export const authService = {
         email: input.email,
         passwordHash,
         role: input.role ?? "STAFF",
-        status: "ACTIVE",
+        status: "PENDING",
       },
     });
 
     return toAuthenticatedUser(user);
   },
 
-  async login(input: LoginInput): Promise<AuthenticationResult> {
+  async login(input: LoginInput, context: LoginContext): Promise<AuthenticationResult> {
     const user = await prisma.user.findUnique({
       where: {
         email: input.email,
@@ -140,16 +147,24 @@ export const authService = {
 
     ensureUserCanAuthenticate(user.status);
 
+    const session = await sessionService.createSession({
+    userId: user.id,
+    userAgent: context.userAgent,
+    ipAddress: context.ipAddress,
+    });
+
     const accessToken = signAccessToken({
       sub: user.id,
       email: user.email,
       role: user.role as AccessTokenPayload["role"],
       status: user.status as AccessTokenPayload["status"],
+      sessionId: session.sessionId
     });
 
     return {
       user: toAuthenticatedUser(user),
       accessToken,
+      refreshToken: session.refreshToken
     };
   },
 
