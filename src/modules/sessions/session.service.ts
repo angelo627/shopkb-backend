@@ -4,6 +4,7 @@ import {
   hashOpaqueToken,
 } from "../../shared/utils/crypto";
 import { env } from "../../config/env";
+import { date } from "zod";
 
 export interface CreateSessionInput {
   userId: string;
@@ -52,4 +53,43 @@ export const sessionService = {
       expiresAt,
     };
   },
+
+    async findSessionByRefreshToken(refreshToken: string) {
+     const refreshTokenHash = hashOpaqueToken(refreshToken);
+
+     return prisma.session.findFirst({
+        where: {
+            refreshTokenHash,
+        },
+        include: {
+            user: true,
+        },
+     });
+    },
+
+    async touchSession(sessionId: string): Promise<void> {
+        await prisma.session.update({
+            where: {
+                id: sessionId,
+            },
+            data: {
+                lastUsedAt: new Date(),
+            },
+        });
+    },
+
+    async revokeSessionByRefreshToken(refreshToken: string): Promise<void> {
+      const refreshTokenHash = hashOpaqueToken(refreshToken);
+
+      await prisma.session.updateMany({
+       where: {
+         refreshTokenHash,
+         revokedAt: null,
+        },
+        
+        data: {
+         revokedAt: new Date(),
+        },
+     });
+    },
 };

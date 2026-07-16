@@ -40,6 +40,10 @@ export interface AuthenticationResult {
   refreshToken: string;
 }
 
+export interface RefreshResult {
+  accessToken: string;
+}
+
 const INVALID_CREDENTIALS_MESSAGE = "Invalid email or password.";
 
 function toAuthenticatedUser(user: {
@@ -181,4 +185,54 @@ export const authService = {
 
     return toAuthenticatedUser(user);
   },
+
+  async refresh(refreshToken: string): Promise<RefreshResult> {
+    const session = 
+      await sessionService.findSessionByRefreshToken(refreshToken);
+
+      if (!session) {
+        throw new AppError(
+          401,
+          "Invalid refresh token.",
+          "INVALID_REFRESH_TOKEN"
+        );
+      }
+
+      if (session.revokedAt) {
+        throw new AppError(
+          401,
+          "Session has been revoked.",
+          "SESSION_REVOKED"
+        );
+      }
+
+      if (session.expiresAt.getTime() < Date.now()) {
+        throw new AppError(
+          401,
+          "Refresh token has expired.",
+          "REFRESH_TOKEN_EXPIRED"
+        );
+      }
+
+      ensureUserCanAuthenticate(session.user.status);
+
+      await sessionService.touchSession(session.id);
+
+
+      const accessToken = signAccessToken({
+        sub: session.user.id,
+        email: session.user.email,
+        role: session.user.role as AccessTokenPayload["role"],
+        status: session.user.status as AccessTokenPayload["status"],
+        sessionId: session.id
+      });
+
+      return {
+        accessToken,
+      };
+  },
+
+  async logout(refreshToken: string): Promise<void> {
+  await sessionService.revokeSessionByRefreshToken(refreshToken);
+  }
 };

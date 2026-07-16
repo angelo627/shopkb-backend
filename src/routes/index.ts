@@ -16,7 +16,7 @@ Apirouter.get("/health", (_req, res) => {
 
 
 // all routes -public
-Apirouter.use("/auth", authRouter); // for login and signup from auths
+Apirouter.use("/auth", authRouter); // for login and signup and others from auths
 
 
 
