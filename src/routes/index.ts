@@ -30,6 +30,11 @@ adminrouter.use(authorize("ADMIN", "SUPERADMIN"));
 // adminrouter.use("/")
 
 
+
+
+
+
+
 // adminrouter linked to apirouter
 Apirouter.use("/admin", adminrouter)
 

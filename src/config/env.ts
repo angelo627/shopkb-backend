@@ -87,4 +87,8 @@ const isProduction =
   passwordResetTtlMinutes: Number(
     process.env.PASSWORD_RESET_TTL_MINUTES ?? 30
   ),
+
+  sessionRetentionDays: Number(
+   process.env.SESSION_RETENTION_DAYS ?? 30
+  ),
 } as const;

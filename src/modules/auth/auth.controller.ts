@@ -48,10 +48,16 @@ export const authController = {
 
     const result = await authService.refresh(refreshToken);
 
+    // Replace the old refresh token cookie with the new one
+    setRefreshTokenCookie(res, result.refreshToken);
+
+    // Never expose the refresh token in the response body
+    const { refreshToken: _, ...data } = result;
+
     res.status(200).json({
       success: true,
       message: "Access token refreshed successfully.",
-      data: result,
+      data,
     });
   }),
 
@@ -85,6 +91,65 @@ export const authController = {
     res.status(200).json({
       success: true,
       message: "Logout successful.",
+    });
+  }),
+
+  logoutAll: asyncHandler(async (req: Request, res: Response) => {
+   if (!req.user) {
+     throw new AppError(
+       401,
+       "Authenticated user not found.",
+       "UNAUTHENTICATED"
+     );
+   }
+ 
+   await authService.logoutAll(req.user.id);
+ 
+   clearRefreshTokenCookie(res);
+ 
+   res.status(200).json({
+     success: true,
+     message: "Logged out from all devices successfully.",
+   });
+  }),
+
+  sessions: asyncHandler(async (req, res) => {
+    const sessions = await authService.getSessions(
+        req.user!.id,
+        req.user!.sessionId
+    );
+
+    res.status(200).json({
+        success: true,
+        message: "Sessions retrieved successfully.",
+        data: sessions,
+    });
+  }),
+
+  revokeSession: asyncHandler(async (req: Request, res: Response) => {
+    if (!req.user) {
+      throw new AppError(
+        401,
+        "Authenticated user not found.",
+        "UNAUTHENTICATED"
+      );
+    }
+
+    const { sessionId } = req.params;
+
+    if (typeof sessionId !== "string") {
+      throw new AppError(
+        400,
+        "Invalid session ID.",
+        "INVALID_SESSION_ID"
+      );
+    }
+
+    await authService.revokeSession(req.user.id, sessionId);
+
+    res.status(200).json({
+      success: true,
+      message: "Session revoked successfully.",
     });
   }),
 };

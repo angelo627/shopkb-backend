@@ -1,6 +1,7 @@
 import { app } from "./app";
 import { env } from "./config/env";
 import { prisma } from "./config/prisma-client";
+import { startSessionCleanupJob } from "./jobs/session-cleanup.job";
 
 let shuttingDown = false;
 
@@ -16,6 +17,8 @@ async function startServer(): Promise<void> {
 
       console.log(` Server is running on port ${env.port}`);
       console.log(` API Base URL: ${baseUrl}`);
+
+      startSessionCleanupJob();
     });
 
     // Handle server startup errors

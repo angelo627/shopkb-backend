@@ -41,6 +41,7 @@ export function authenticate(
       email: payload.email,
       role: payload.role,
       status: payload.status,
+      sessionId: payload.sessionId,
     };
 
     return next();

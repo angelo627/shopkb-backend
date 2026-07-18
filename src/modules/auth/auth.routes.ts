@@ -9,9 +9,12 @@ const authRouter = Router();
 authRouter.post("/register", authController.register);
 authRouter.post("/login", authController.login);
 authRouter.post("/refresh", authController.refresh);
-authRouter.post("/logout", authController.logout);
+authRouter.post("/logout",  authController.logout);
 
 // Protected Routes
 authRouter.get("/profile", authenticate, authController.getProfile);
+authRouter.post("/logout-all", authenticate, authController.logoutAll);
+authRouter.get("/getallsessions", authenticate,  authController.sessions);
+authRouter.post("/sessions/:sessionId/revoke", authenticate, authController.revokeSession);
 
 export { authRouter };

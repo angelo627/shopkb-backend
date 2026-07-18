@@ -42,6 +42,17 @@ export interface AuthenticationResult {
 
 export interface RefreshResult {
   accessToken: string;
+  refreshToken: string;
+}
+
+export interface SessionDto {
+  id: string;
+  userAgent: string | null;
+  ipAddress: string | null;
+  lastUsedAt: Date | null;
+  createdAt: Date;
+  expiresAt: Date;
+  current: boolean;
 }
 
 const INVALID_CREDENTIALS_MESSAGE = "Invalid email or password.";
@@ -216,9 +227,10 @@ export const authService = {
 
       ensureUserCanAuthenticate(session.user.status);
 
-      await sessionService.touchSession(session.id);
+      // Rotate the refresh token
+      const rotatedSession = await sessionService.rotateRefreshToken(session.id);
 
-
+      // Generate a new access token
       const accessToken = signAccessToken({
         sub: session.user.id,
         email: session.user.email,
@@ -229,10 +241,50 @@ export const authService = {
 
       return {
         accessToken,
+        refreshToken: rotatedSession.refreshToken,
       };
   },
 
   async logout(refreshToken: string): Promise<void> {
-  await sessionService.revokeSessionByRefreshToken(refreshToken);
-  }
+   await sessionService.revokeSessionByRefreshToken(refreshToken);
+  },
+
+  async logoutAll(userId: string): Promise<void> {
+   await sessionService.revokeAllUserSessions(userId);
+  },
+
+  async getSessions(
+    userId: string,
+    currentSessionId: string
+  ): Promise<SessionDto[]> {
+    const sessions = await prisma.session.findMany({
+      where: {
+        userId,
+        revokedAt: null,
+      },
+      orderBy: {
+        lastUsedAt: "desc",
+      },
+    });
+  
+    return sessions.map((session) => ({
+      id: session.id,
+      userAgent: session.userAgent,
+      ipAddress: session.ipAddress,
+      lastUsedAt: session.lastUsedAt,
+      createdAt: session.createdAt,
+      expiresAt: session.expiresAt,
+      current: session.id === currentSessionId,
+    }));
+  },
+
+  async revokeSession(
+    userId: string,
+    sessionId: string
+  ): Promise<void> {
+    await sessionService.revokeSession(
+      sessionId,
+      userId
+    );
+  },
 };
