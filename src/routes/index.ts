@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import { authRouter } from "../modules/auth/auth.routes";
 import { authenticate, authorize } from "../middlewares/auth.middleware"
+import { productRouter } from "../modules/products/product.routes";
 
 const Apirouter = Router();
 const adminrouter = Router();
@@ -20,22 +21,32 @@ Apirouter.use("/auth", authRouter); // for login and signup and others from auth
 
 
 
-// protected routes for users etc
+// Everything below requires authentication, protected routes for users etc
 Apirouter.use(authenticate);
 
 
 
-//all adminroutes 
+
+
+
+
+//this section will be for SuperAdmin routes
+adminrouter.use("/admin", authorize( "SUPERADMIN"), productRouter);
+
+
+
+
+
+
+//Admin & SuperAdmin, all adminroutes access based 
 adminrouter.use(authorize("ADMIN", "SUPERADMIN"));
-// adminrouter.use("/")
 
 
 
 
 
 
-
-// adminrouter linked to apirouter
-Apirouter.use("/admin", adminrouter)
+// adminrouter linked to apirouter "/admin" for the route below incase 
+Apirouter.use("/", adminrouter)
 
 export default Apirouter;
