@@ -1,20 +1,21 @@
-import { ProductStatus } from "@prisma/client";
+import { Product, ProductStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma-client";
 import { AppError } from "../../shared/errors/app-error";
 import {
   ProductDetailResponse,
   toProductDetailResponse,
 } from "./product.mapper";
+import { uploadImage } from "../../shared/utils/upload-image";
 
 export interface CreateProductInput {
   name: string;
   sku: string;
-  description?: string;
-  imageUrl?: string;
+  description?: string | undefined;
+  imageFile?: Express.Multer.File | undefined;
   costPrice: number;
   sellingPrice: number;
-  stockQuantity?: number;
-  minimumStock?: number;
+  stockQuantity?: number | undefined;
+  minimumStock?: number | undefined;
 }
 
 function determineProductStatus(
@@ -25,6 +26,28 @@ function determineProductStatus(
     : ProductStatus.OUT_OF_STOCK;
 }
 
+// have not implemented this helper function
+function ensureProductCanBeSold(product: Product): void {
+  switch (product.status) {
+    case ProductStatus.AVAILABLE:
+      return;
+
+    case ProductStatus.OUT_OF_STOCK:
+      throw new AppError(
+        400,
+        "This product is out of stock.",
+        "PRODUCT_OUT_OF_STOCK"
+      );
+
+    case ProductStatus.INACTIVE:
+      throw new AppError(
+        400,
+        "This product is inactive and cannot be sold.",
+        "PRODUCT_INACTIVE"
+      );
+  }
+}
+
 export const productService = {
   async createProduct(
     input: CreateProductInput
@@ -33,7 +56,17 @@ export const productService = {
     const name = input.name.trim();
     const sku = input.sku.trim().toUpperCase();
     const description = input.description?.trim() || null;
-    const imageUrl = input.imageUrl?.trim() || null;
+    
+    let imageUrl: string | null = null;
+
+     if (input.imageFile) {
+       const uploadedImage = await uploadImage(
+         input.imageFile.buffer,
+         "shopkb/products"
+       );
+     
+       imageUrl = uploadedImage.secure_url;
+    }
 
     const stockQuantity = input.stockQuantity ?? 0;
     const minimumStock = input.minimumStock ?? 0;

@@ -5,10 +5,11 @@ import { productService } from "./product.service";
 export const productController = {
   createProduct: asyncHandler(
     async (req: Request, res: Response) => {
-      const result = await productService.createProduct(
-        req.body
-      );
-
+      const result = await productService.createProduct({
+          ...req.body,
+          imageFile: req.file,
+        });
+        
       res.status(201).json({
         success: true,
         message: "Product created successfully.",

@@ -1,26 +1,5 @@
 import { Product, ProductStatus } from "@prisma/client";
 
-export interface CreateProductInput {
-  name: string;
-  sku: string;
-  description?: string;
-  imageUrl?: string;
-  costPrice: number;
-  sellingPrice: number;
-  stockQuantity?: number;
-  minimumStock?: number;
-}
-
-function determineProductStatus(
-  stockQuantity: number
-): ProductStatus {
-  return stockQuantity > 0
-    ? ProductStatus.AVAILABLE
-    : ProductStatus.OUT_OF_STOCK;
-}
-
-
-
 //Response Models
 export interface ProductDetailResponse {
   id: string;
@@ -28,8 +7,8 @@ export interface ProductDetailResponse {
   sku: string;
   description: string | null;
   imageUrl: string |null;
-  costPrice: Product["costPrice"];
-  sellingPrice: Product["sellingPrice"];
+  costPrice: number;
+  sellingPrice: number;
   stockQuantity: number;
   minimumStock: number;
   status: ProductStatus;
@@ -42,7 +21,7 @@ export interface ProductListResponse {
   name: string;
   sku: string;
   imageUrl: string | null;
-  sellingPrice: Product["sellingPrice"];
+  sellingPrice: number;
   stockQuantity: number;
   minimumStock: number;
   status: ProductStatus;
@@ -53,7 +32,7 @@ export interface ProductSalesResponse {
   name: string;
   sku: string;
   imageUrl: string | null;
-  sellingPrice: Product["sellingPrice"];
+  sellingPrice: number;
   stockQuantity: number;
   status: ProductStatus;
 }
@@ -85,8 +64,8 @@ function mapProductMediaFields(product: Product) {
 
 function mapProductPricingFields(product: Product) {
   return {
-    costPrice: product.costPrice,
-    sellingPrice: product.sellingPrice,
+    costPrice: product.costPrice.toNumber(),
+    sellingPrice: product.sellingPrice.toNumber(),
   };
 }
 
@@ -132,7 +111,7 @@ export function toProductListResponse(
 
     ...mapProductMediaFields(product),
 
-    sellingPrice: product.sellingPrice,
+    sellingPrice: product.sellingPrice.toNumber(),
 
     ...mapProductInventoryFields(product),
   };
@@ -146,7 +125,7 @@ export function toProductSalesResponse(
 
     ...mapProductMediaFields(product),
 
-    sellingPrice: product.sellingPrice,
+    sellingPrice: product.sellingPrice.toNumber(),
 
     stockQuantity: product.stockQuantity,
 
