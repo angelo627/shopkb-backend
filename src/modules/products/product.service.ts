@@ -1,4 +1,5 @@
 import { Product, ProductStatus } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma-client";
 import { AppError } from "../../shared/errors/app-error";
 import {
@@ -6,6 +7,8 @@ import {
   toProductDetailResponse,
 } from "./product.mapper";
 import { uploadImage } from "../../shared/utils/upload-image";
+import { ProductListResponse, toProductListResponse } from "./product.mapper";
+import type { GetProductsQuery } from "./product.validation";
 
 export interface CreateProductInput {
   name: string;
@@ -16,6 +19,23 @@ export interface CreateProductInput {
   sellingPrice: number;
   stockQuantity?: number | undefined;
   minimumStock?: number | undefined;
+}
+
+// export interface GetProductsQuery {
+//   page?: number | undefined;
+//   limit?: number | undefined;
+//   search?: string | undefined;
+//   status?: ProductStatus | undefined;
+// }
+
+export interface PaginatedProductsResponse {
+  items: ProductListResponse[];
+  pagination: {
+    page: number;
+    limit: number;
+    totalItems: number;
+    totalPages: number;
+  };
 }
 
 function determineProductStatus(
@@ -50,22 +70,22 @@ function ensureProductCanBeSold(product: Product): void {
 
 export const productService = {
   async createProduct(
-    input: CreateProductInput
+    input: CreateProductInput,
   ): Promise<ProductDetailResponse> {
     // Normalize input
     const name = input.name.trim();
     const sku = input.sku.trim().toUpperCase();
     const description = input.description?.trim() || null;
-    
+
     let imageUrl: string | null = null;
 
-     if (input.imageFile) {
-       const uploadedImage = await uploadImage(
-         input.imageFile.buffer,
-         "shopkb/products"
-       );
-     
-       imageUrl = uploadedImage.secure_url;
+    if (input.imageFile) {
+      const uploadedImage = await uploadImage(
+        input.imageFile.buffer,
+        "shopkb/products",
+      );
+
+      imageUrl = uploadedImage.secure_url;
     }
 
     const stockQuantity = input.stockQuantity ?? 0;
@@ -76,23 +96,19 @@ export const productService = {
       throw new AppError(
         400,
         "Product name is required.",
-        "INVALID_PRODUCT_NAME"
+        "INVALID_PRODUCT_NAME",
       );
     }
 
     if (!sku) {
-      throw new AppError(
-        400,
-        "SKU is required.",
-        "INVALID_SKU"
-      );
+      throw new AppError(400, "SKU is required.", "INVALID_SKU");
     }
 
     if (input.costPrice < 0) {
       throw new AppError(
         400,
         "Cost price cannot be negative.",
-        "INVALID_COST_PRICE"
+        "INVALID_COST_PRICE",
       );
     }
 
@@ -100,7 +116,7 @@ export const productService = {
       throw new AppError(
         400,
         "Selling price cannot be negative.",
-        "INVALID_SELLING_PRICE"
+        "INVALID_SELLING_PRICE",
       );
     }
 
@@ -108,7 +124,7 @@ export const productService = {
       throw new AppError(
         400,
         "Stock quantity cannot be negative.",
-        "INVALID_STOCK_QUANTITY"
+        "INVALID_STOCK_QUANTITY",
       );
     }
 
@@ -116,7 +132,7 @@ export const productService = {
       throw new AppError(
         400,
         "Minimum stock cannot be negative.",
-        "INVALID_MINIMUM_STOCK"
+        "INVALID_MINIMUM_STOCK",
       );
     }
 
@@ -124,7 +140,7 @@ export const productService = {
       throw new AppError(
         400,
         "Selling price cannot be less than cost price.",
-        "INVALID_SELLING_PRICE"
+        "INVALID_SELLING_PRICE",
       );
     }
 
@@ -139,7 +155,7 @@ export const productService = {
       throw new AppError(
         409,
         "A product with this SKU already exists.",
-        "PRODUCT_ALREADY_EXISTS"
+        "PRODUCT_ALREADY_EXISTS",
       );
     }
 
@@ -157,6 +173,81 @@ export const productService = {
         status: determineProductStatus(stockQuantity),
       },
     });
+
+    return toProductDetailResponse(product);
+  },
+
+  async getProducts(
+    query: GetProductsQuery,
+  ): Promise<PaginatedProductsResponse> {
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.max(1, query.limit ?? 10);
+
+    const skip = (page - 1) * limit;
+
+    const where = {
+      deletedAt: null,
+
+      ...(query.status && {
+        status: query.status,
+      }),
+
+      ...(query.search && {
+        OR: [
+          {
+            name: {
+              contains: query.search,
+              mode: Prisma.QueryMode.insensitive,
+            },
+          },
+          {
+            sku: {
+              contains: query.search,
+              mode: Prisma.QueryMode.insensitive,
+            },
+          },
+        ],
+      }),
+    };
+
+    const [products, totalItems] = await prisma.$transaction([
+      prisma.product.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: {
+          createdAt: "desc",
+        },
+      }),
+
+      prisma.product.count({
+        where,
+      }),
+    ]);
+
+    return {
+      items: products.map(toProductListResponse),
+
+      pagination: {
+        page,
+        limit,
+        totalItems,
+        totalPages: Math.ceil(totalItems / limit),
+      },
+    };
+  },
+
+  async getProductById(productId: string): Promise<ProductDetailResponse> {
+    const product = await prisma.product.findFirst({
+      where: {
+        id: productId,
+        deletedAt: null,
+      },
+    });
+
+    if (!product) {
+      throw new AppError(404, "Product not found.", "PRODUCT_NOT_FOUND");
+    }
 
     return toProductDetailResponse(product);
   },

@@ -2,10 +2,20 @@ import { ZodObject, ZodError } from "zod";
 import { Request, Response, NextFunction } from "express";
 import { AppError } from "../errors/app-error";
 
-export function validateRequest(schema: ZodObject) {
-  return (req: Request, _res: Response, next: NextFunction) => {
+type ValidationTarget = "body" | "query" | "params";
+
+export function validateRequest(
+  schema: ZodObject,
+  target: ValidationTarget = "body"
+) {
+  return (
+    req: Request,
+    _res: Response,
+    next: NextFunction
+  ) => {
     try {
-      req.body = schema.parse(req.body);
+      schema.parse(req[target]);
+
       next();
     } catch (error) {
       if (error instanceof ZodError) {
