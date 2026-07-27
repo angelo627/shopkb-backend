@@ -43,3 +43,21 @@ export const getProductByIdSchema = z.object({
 });
 
 export type GetProductsQuery = z.infer<typeof getProductsSchema>;
+
+export const updateProductSchema = z.object({
+  name: z.string().trim().min(1).optional(),
+
+  sku: z.string().trim().min(1).optional(),
+
+  description: z.string().trim().optional(),
+
+  costPrice: z.coerce.number().nonnegative().optional(),
+
+  sellingPrice: z.coerce.number().nonnegative().optional(),
+
+  minimumStock: z.coerce
+    .number()
+    .int()
+    .nonnegative()
+    .optional(),
+});

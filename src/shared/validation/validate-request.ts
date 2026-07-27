@@ -14,7 +14,9 @@ export function validateRequest(
     next: NextFunction
   ) => {
     try {
-      schema.parse(req[target]);
+      const parsed = schema.parse(req[target]);
+
+      Object.assign(req[target], parsed);
 
       next();
     } catch (error) {

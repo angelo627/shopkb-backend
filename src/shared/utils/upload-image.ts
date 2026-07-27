@@ -29,3 +29,9 @@ export async function uploadImage(
       .end(buffer);
   });
 }
+
+export async function deleteImage(
+  publicId: string
+): Promise<void> {
+  await cloudinary.uploader.destroy(publicId);
+}

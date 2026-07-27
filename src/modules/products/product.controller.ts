@@ -48,4 +48,27 @@ export const productController = {
       data: result,
     });
   }),
+
+  updateProduct: asyncHandler(async (req: Request, res: Response) => {
+    const productId = req.params.id;
+
+    if (!productId || Array.isArray(productId)) {
+      throw new AppError(
+        400,
+        "Invalid or missing product ID.",
+        "INVALID_PRODUCT_ID",
+      );
+    }
+
+    const result = await productService.updateProduct(productId, {
+      ...req.body,
+      imageFile: req.file,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Product updated successfully.",
+      data: result,
+    });
+  }),
 };

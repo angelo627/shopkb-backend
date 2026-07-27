@@ -6,7 +6,7 @@ import {
   ProductDetailResponse,
   toProductDetailResponse,
 } from "./product.mapper";
-import { uploadImage } from "../../shared/utils/upload-image";
+import { uploadImage, deleteImage } from "../../shared/utils/upload-image";
 import { ProductListResponse, toProductListResponse } from "./product.mapper";
 import type { GetProductsQuery } from "./product.validation";
 
@@ -36,6 +36,17 @@ export interface PaginatedProductsResponse {
     totalItems: number;
     totalPages: number;
   };
+}
+
+export interface UpdateProductInput {
+  name?: string;
+  sku?: string;
+  description?: string | undefined;
+  imageFile?: Express.Multer.File | undefined;
+
+  costPrice?: number;
+  sellingPrice?: number;
+  minimumStock?: number;
 }
 
 function determineProductStatus(
@@ -78,6 +89,7 @@ export const productService = {
     const description = input.description?.trim() || null;
 
     let imageUrl: string | null = null;
+    let imagePublicId: string | null = null;
 
     if (input.imageFile) {
       const uploadedImage = await uploadImage(
@@ -86,6 +98,7 @@ export const productService = {
       );
 
       imageUrl = uploadedImage.secure_url;
+      imagePublicId = uploadedImage.public_id;
     }
 
     const stockQuantity = input.stockQuantity ?? 0;
@@ -166,6 +179,7 @@ export const productService = {
         sku,
         description,
         imageUrl,
+        imagePublicId,
         costPrice: input.costPrice,
         sellingPrice: input.sellingPrice,
         stockQuantity,
@@ -250,5 +264,136 @@ export const productService = {
     }
 
     return toProductDetailResponse(product);
+  },
+
+  async updateProduct(
+    productId: string,
+    input: UpdateProductInput,
+  ): Promise<ProductDetailResponse> {
+    // Find product
+    const product = await prisma.product.findFirst({
+      where: {
+        id: productId,
+        deletedAt: null,
+      },
+    });
+
+    if (!product) {
+      throw new AppError(404, "Product not found.", "PRODUCT_NOT_FOUND");
+    }
+
+    // Normalize incoming values
+    const name = input.name?.trim() ?? product.name;
+    const sku = input.sku?.trim().toUpperCase() ?? product.sku;
+    const description =
+      input.description !== undefined
+        ? input.description.trim()
+        : product.description;
+
+    const costPrice = input.costPrice ?? product.costPrice.toNumber();
+
+    const sellingPrice = input.sellingPrice ?? product.sellingPrice.toNumber();
+
+    const minimumStock = input.minimumStock ?? product.minimumStock;
+
+    // Validate
+    if (!name) {
+      throw new AppError(
+        400,
+        "Product name is required.",
+        "INVALID_PRODUCT_NAME",
+      );
+    }
+
+    if (!sku) {
+      throw new AppError(400, "SKU is required.", "INVALID_SKU");
+    }
+
+    if (costPrice < 0) {
+      throw new AppError(
+        400,
+        "Cost price cannot be negative.",
+        "INVALID_COST_PRICE",
+      );
+    }
+
+    if (sellingPrice < 0) {
+      throw new AppError(
+        400,
+        "Selling price cannot be negative.",
+        "INVALID_SELLING_PRICE",
+      );
+    }
+
+    if (minimumStock < 0) {
+      throw new AppError(
+        400,
+        "Minimum stock cannot be negative.",
+        "INVALID_MINIMUM_STOCK",
+      );
+    }
+
+    if (sellingPrice < costPrice) {
+      throw new AppError(
+        400,
+        "Selling price cannot be less than cost price.",
+        "INVALID_SELLING_PRICE",
+      );
+    }
+
+    // Ensure SKU is unique if changed
+    if (sku !== product.sku) {
+      const existing = await prisma.product.findUnique({
+        where: { sku },
+      });
+
+      if (existing) {
+        throw new AppError(
+          409,
+          "A product with this SKU already exists.",
+          "PRODUCT_ALREADY_EXISTS",
+        );
+      }
+    }
+
+    // Preserve current image
+    let imageUrl = product.imageUrl;
+    let imagePublicId = product.imagePublicId;
+
+    // Upload replacement image if supplied
+    if (input.imageFile) {
+      const uploadedImage = await uploadImage(
+        input.imageFile.buffer,
+        "shopkb/products",
+      );
+
+      imageUrl = uploadedImage.secure_url;
+      imagePublicId = uploadedImage.public_id;
+    }
+
+    // Update database
+    const updatedProduct = await prisma.product.update({
+      where: {
+        id: product.id,
+      },
+      data: {
+        name,
+        sku,
+        description,
+        imageUrl,
+        imagePublicId,
+        costPrice,
+        sellingPrice,
+        minimumStock,
+      },
+    });
+
+    // Delete old image only after successful update
+    if (input.imageFile && product.imagePublicId) {
+      await deleteImage(product.imagePublicId);
+    }
+
+    return toProductDetailResponse(updatedProduct);
+    
   },
 };
