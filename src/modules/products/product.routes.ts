@@ -26,6 +26,12 @@ adminProductRouter.patch(
   validateRequest(getProductByIdSchema, "params"),
   productController.updateProduct,
 );
+
+adminProductRouter.delete(
+  "/deleteproduct/:id",
+  validateRequest(getProductByIdSchema, "params"),
+  productController.deleteProduct,
+);
     
 
 

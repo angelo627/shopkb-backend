@@ -1,14 +1,21 @@
-import { Product, ProductStatus } from "@prisma/client";
+import { Product, ProductStatus, ActivityAction, ActivityEntity } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma-client";
 import { AppError } from "../../shared/errors/app-error";
 import {
   ProductDetailResponse,
   toProductDetailResponse,
+  DeletedProductResponse,
+  toDeletedProductResponse,
+  ProductListResponse,
+  toProductListResponse
 } from "./product.mapper";
 import { uploadImage, deleteImage } from "../../shared/utils/upload-image";
-import { ProductListResponse, toProductListResponse } from "./product.mapper";
 import type { GetProductsQuery } from "./product.validation";
+import { activityLogService } from "../activity-logs/activity-log.service";
+import { activityDescription } from "../activity-logs/activity-description";
+import { BusinessDayStatus } from "@prisma/client";
+import { businessDayService } from "../businessDay/business-day.service";
 
 export interface CreateProductInput {
   name: string;
@@ -49,6 +56,10 @@ export interface UpdateProductInput {
   minimumStock?: number;
 }
 
+export interface ProductActionContext {
+  userId: string;
+}
+
 function determineProductStatus(
   stockQuantity: number
 ): ProductStatus {
@@ -79,8 +90,27 @@ function ensureProductCanBeSold(product: Product): void {
   }
 }
 
+async function getOpenBusinessDay() {
+  const businessDay = await prisma.businessDay.findFirst({
+    where: {
+      status: BusinessDayStatus.OPEN,
+    },
+  });
+
+  if (!businessDay) {
+    throw new AppError(
+      404,
+      "No business day is currently open.",
+      "BUSINESS_DAY_NOT_FOUND",
+    );
+  }
+
+  return businessDay;
+}
+
 export const productService = {
   async createProduct(
+    context: ProductActionContext,
     input: CreateProductInput,
   ): Promise<ProductDetailResponse> {
     // Normalize input
@@ -172,20 +202,43 @@ export const productService = {
       );
     }
 
+    const businessDay = await businessDayService.requireOpenBusinessDay();
+
     // Create product
-    const product = await prisma.product.create({
-      data: {
-        name,
-        sku,
-        description,
-        imageUrl,
-        imagePublicId,
-        costPrice: input.costPrice,
-        sellingPrice: input.sellingPrice,
-        stockQuantity,
-        minimumStock,
-        status: determineProductStatus(stockQuantity),
-      },
+    const product = await prisma.$transaction(async (tx) => {
+      const product = await tx.product.create({
+        data: {
+          name,
+          sku,
+          description,
+          imageUrl,
+          imagePublicId,
+          costPrice: input.costPrice,
+          sellingPrice: input.sellingPrice,
+          stockQuantity,
+          minimumStock,
+          status: determineProductStatus(stockQuantity),
+        },
+      });
+
+      await activityLogService.createActivity(
+        {
+          userId: context.userId,
+
+          businessDayId: businessDay.id,
+
+          action: ActivityAction.PRODUCT_CREATED,
+
+          entityType: ActivityEntity.PRODUCT,
+
+          entityId: product.id,
+
+          description: activityDescription.productCreated(product.name),
+        },
+        tx,
+      );
+
+      return product;
     });
 
     return toProductDetailResponse(product);
@@ -394,6 +447,29 @@ export const productService = {
     }
 
     return toProductDetailResponse(updatedProduct);
-    
+  },
+
+  async deleteProduct(productId: string): Promise<DeletedProductResponse> {
+    const product = await prisma.product.findFirst({
+      where: {
+        id: productId,
+        deletedAt: null,
+      },
+    });
+
+    if (!product) {
+      throw new AppError(404, "Product not found.", "PRODUCT_NOT_FOUND");
+    }
+
+    const deletedProduct = await prisma.product.update({
+      where: {
+        id: product.id,
+      },
+      data: {
+        deletedAt: new Date(),
+      },
+    });
+
+    return toDeletedProductResponse(deletedProduct);
   },
 };

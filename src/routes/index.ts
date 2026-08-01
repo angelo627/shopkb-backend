@@ -3,6 +3,10 @@ import { Router } from "express";
 import { authRouter } from "../modules/auth/auth.routes";
 import { authenticate, authorize } from "../middlewares/auth.middleware"
 import { productRouter, adminProductRouter } from "../modules/products/product.routes";
+import {
+  businessDayRouter,
+  adminBusinessDayRouter,
+} from "../modules/businessDay/business-day.routes";
 
 const Apirouter = Router();
 const adminrouter = Router();
@@ -27,6 +31,7 @@ Apirouter.use("/auth", authRouter); // for login and signup and others from auth
 // Everything below requires authentication, protected routes for users etc
 Apirouter.use(authenticate);
 Apirouter.use("/user", productRouter);
+Apirouter.use("/user", businessDayRouter);
 
 
 
@@ -45,6 +50,7 @@ Apirouter.use("/user", productRouter);
 //Admin & SuperAdmin, all adminroutes access based 
 adminrouter.use(authorize("ADMIN", "SUPERADMIN"));
 adminrouter.use("/admin", adminProductRouter);
+adminrouter.use("/admin", adminBusinessDayRouter);
 
 
 

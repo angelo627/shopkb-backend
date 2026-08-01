@@ -42,6 +42,37 @@ enum MovementReason {
  ADJUSTMENT
 }
 
+enum ActivityAction {
+  LOGIN
+  LOGOUT
+
+  PRODUCT_CREATED
+  PRODUCT_UPDATED
+  PRODUCT_DELETED
+  PRODUCT_RESTORED
+
+  STOCK_RECEIVED
+  STOCK_ADJUSTED
+  STOCK_REMOVED
+
+  SALE_CREATED
+  SALE_CANCELLED
+
+  BUSINESS_DAY_OPENED
+  BUSINESS_DAY_CLOSED
+
+  USER_CREATED
+  USER_UPDATED
+  USER_DISABLED
+}
+
+enum ActivityEntity {
+  PRODUCT
+  SALE
+  USER
+  BUSINESS_DAY
+}
+
 model User {
  id           String   @id @default(uuid())
  fullName     String
@@ -138,6 +169,7 @@ model BusinessDay {
  closedAt      DateTime?
 
  createdAt     DateTime @default(now())
+ updatedAt     DateTime @updatedAt
 }
 
 model Sale {
@@ -191,20 +223,26 @@ model StockMovement {
 }
 
 model ActivityLog {
- id             String @id @default(uuid())
+  id     String @id @default(uuid())
 
- userId         String
- user           User @relation(fields: [userId], references: [id])
+  userId String
+  user   User @relation(fields: [userId], references: [id])
 
- businessDayId  String
- businessDay    BusinessDay @relation(fields: [businessDayId], references: [id])
+  businessDayId String?
+  businessDay BusinessDay?  @relation(fields: [businessDayId], references: [id])
 
- action         String
+  action ActivityAction
 
- details        String?
+  entityType ActivityEntity?
 
- createdAt      DateTime @default(now())
+  entityId String?
 
- @@index([businessDayId])
- @@index([userId])
+  description String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([businessDayId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
 }
