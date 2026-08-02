@@ -18,4 +18,12 @@ export const activityDescription = {
   stockOut(name: string, quantity: number) {
     return `Removed ${quantity} units from "${name}".`;
   },
+
+  productDeactivated(name: string) {
+    return `Deactivated product "${name}".`;
+  },
+
+  productActivated(name: string) {
+    return `Activated product "${name}".`;
+  },
 };

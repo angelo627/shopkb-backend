@@ -69,6 +69,14 @@ export const businessDayService = {
     return await getOpenBusinessDay();
   },
 
+  async getCurrentBusinessDayOrNull() {
+    return await prisma.businessDay.findFirst({
+      where: {
+        status: BusinessDayStatus.OPEN,
+      },
+    });
+  },
+
   async openBusinessDay(
     context: BusinessDayContext,
   ): Promise<BusinessDayResponse> {

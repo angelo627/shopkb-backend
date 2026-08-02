@@ -458,7 +458,11 @@ export const productService = {
     });
 
     if (!product) {
-      throw new AppError(404, "Product not found.", "PRODUCT_NOT_FOUND");
+      throw new AppError(
+        404, 
+        "Product not found.",
+        "PRODUCT_NOT_FOUND"
+      );
     }
 
     const deletedProduct = await prisma.product.update({
@@ -471,5 +475,64 @@ export const productService = {
     });
 
     return toDeletedProductResponse(deletedProduct);
+  },
+
+  async deactivateProduct(
+    productId: string,
+    context: ProductActionContext,
+  ): Promise<ProductDetailResponse> {
+    const product = await prisma.product.findFirst({
+      where: {
+        id: productId,
+        deletedAt: null,
+      },
+    });
+
+    if (!product) {
+      throw new AppError(
+        404,
+       "Product not found.",
+       "PRODUCT_NOT_FOUND"
+      );
+    }
+
+    // Idempotent: already inactive
+    if (product.status === ProductStatus.INACTIVE) {
+      return toProductDetailResponse(product);
+    }
+
+    const businessDay = await businessDayService.getCurrentBusinessDayOrNull();
+
+    const updatedProduct = await prisma.$transaction(async (tx) => {
+      const updated = await tx.product.update({
+        where: {
+          id: product.id,
+        },
+        data: {
+          status: ProductStatus.INACTIVE,
+        },
+      });
+
+      await activityLogService.createActivity(
+        {
+          userId: context.userId,
+
+          businessDayId: businessDay?.id ?? null,
+
+          action: ActivityAction.PRODUCT_DEACTIVATED,
+
+          entityType: ActivityEntity.PRODUCT,
+
+          entityId: updated.id,
+
+          description: activityDescription.productDeactivated(updated.name),
+        },
+        tx,
+      );
+
+      return updated;
+    });
+
+    return toProductDetailResponse(updatedProduct);
   },
 };

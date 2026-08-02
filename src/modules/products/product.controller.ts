@@ -30,7 +30,6 @@ export const productController = {
     });
   }),
 
-
   getProducts: asyncHandler(async (req, res) => {
     const query = getProductsSchema.parse(req.query);
 
@@ -42,7 +41,6 @@ export const productController = {
       data: result,
     });
   }),
-
 
   getProductById: asyncHandler(async (req, res) => {
     const productId = req.params.id;
@@ -62,7 +60,6 @@ export const productController = {
       data: result,
     });
   }),
-
 
   updateProduct: asyncHandler(async (req: Request, res: Response) => {
     const productId = req.params.id;
@@ -87,7 +84,6 @@ export const productController = {
     });
   }),
 
-
   deleteProduct: asyncHandler(async (req, res) => {
     const productId = req.params.id;
 
@@ -104,6 +100,28 @@ export const productController = {
     res.status(200).json({
       success: true,
       message: "Product deleted successfully.",
+      data: result,
+    });
+  }),
+
+  deactivateProduct: asyncHandler(async (req: Request, res: Response) => {
+    if (!req.user) {
+      throw new AppError(
+        401,
+        "Authenticated user not found.",
+        "UNAUTHENTICATED",
+      );
+    }
+
+    const { id } = req.params as { id: string };
+
+    const result = await productService.deactivateProduct(id, {
+      userId: req.user.id,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Product deactivated successfully.",
       data: result,
     });
   }),
