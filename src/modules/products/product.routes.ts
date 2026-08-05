@@ -38,6 +38,12 @@ adminProductRouter.patch(
   validateRequest(getProductByIdSchema, "params"),
   productController.deactivateProduct,
 );
+
+adminProductRouter.patch(
+  "/:id/reactivate",
+  validateRequest(getProductByIdSchema, "params"),
+  productController.reactivateProduct,
+);
     
 
 

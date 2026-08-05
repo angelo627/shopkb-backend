@@ -7,6 +7,7 @@ import {
   businessDayRouter,
   adminBusinessDayRouter,
 } from "../modules/businessDay/business-day.routes";
+import { adminActivityLogRouter } from "../modules/activity-logs/activity-log.routes";
 
 const Apirouter = Router();
 const adminrouter = Router();
@@ -51,6 +52,7 @@ Apirouter.use("/user", businessDayRouter);
 adminrouter.use(authorize("ADMIN", "SUPERADMIN"));
 adminrouter.use("/admin", adminProductRouter);
 adminrouter.use("/admin", adminBusinessDayRouter);
+adminrouter.use("/admin", adminActivityLogRouter);
 
 
 

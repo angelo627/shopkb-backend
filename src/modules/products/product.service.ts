@@ -13,7 +13,7 @@ import {
 import { uploadImage, deleteImage } from "../../shared/utils/upload-image";
 import type { GetProductsQuery } from "./product.validation";
 import { activityLogService } from "../activity-logs/activity-log.service";
-import { activityDescription } from "../activity-logs/activity-description";
+import { activityDescription } from "../activity-logs/activity-log.mapper";
 import { BusinessDayStatus } from "@prisma/client";
 import { businessDayService } from "../businessDay/business-day.service";
 
@@ -458,11 +458,7 @@ export const productService = {
     });
 
     if (!product) {
-      throw new AppError(
-        404, 
-        "Product not found.",
-        "PRODUCT_NOT_FOUND"
-      );
+      throw new AppError(404, "Product not found.", "PRODUCT_NOT_FOUND");
     }
 
     const deletedProduct = await prisma.product.update({
@@ -489,11 +485,7 @@ export const productService = {
     });
 
     if (!product) {
-      throw new AppError(
-        404,
-       "Product not found.",
-       "PRODUCT_NOT_FOUND"
-      );
+      throw new AppError(404, "Product not found.", "PRODUCT_NOT_FOUND");
     }
 
     // Idempotent: already inactive
@@ -526,6 +518,63 @@ export const productService = {
           entityId: updated.id,
 
           description: activityDescription.productDeactivated(updated.name),
+        },
+        tx,
+      );
+
+      return updated;
+    });
+
+    return toProductDetailResponse(updatedProduct);
+  },
+
+  async reactivateProduct(
+    productId: string,
+    context: ProductActionContext,
+  ): Promise<ProductDetailResponse> {
+    const product = await prisma.product.findFirst({
+      where: {
+        id: productId,
+        deletedAt: null,
+      },
+    });
+
+    if (!product) {
+      throw new AppError(404, "Product not found.", "PRODUCT_NOT_FOUND");
+    }
+
+    // Already active (AVAILABLE or OUT_OF_STOCK)
+    if (product.status !== ProductStatus.INACTIVE) {
+      return toProductDetailResponse(product);
+    }
+
+    const businessDay = await businessDayService.getCurrentBusinessDayOrNull();
+
+    const newStatus = determineProductStatus(product.stockQuantity);
+
+    const updatedProduct = await prisma.$transaction(async (tx) => {
+      const updated = await tx.product.update({
+        where: {
+          id: product.id,
+        },
+        data: {
+          status: newStatus,
+        },
+      });
+
+      await activityLogService.createActivity(
+        {
+          userId: context.userId,
+
+          businessDayId: businessDay?.id ?? null,
+
+          action: ActivityAction.PRODUCT_UPDATED,
+
+          entityType: ActivityEntity.PRODUCT,
+
+          entityId: updated.id,
+
+          description: activityDescription.productReactivated(updated.name),
         },
         tx,
       );

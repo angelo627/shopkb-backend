@@ -125,4 +125,26 @@ export const productController = {
       data: result,
     });
   }),
+
+  reactivateProduct: asyncHandler(async (req: Request, res: Response) => {
+    if (!req.user) {
+      throw new AppError(
+        401,
+        "Authenticated user not found.",
+        "UNAUTHENTICATED",
+      );
+    }
+
+    const { id } = req.params as { id: string };
+
+    const result = await productService.reactivateProduct(id, {
+      userId: req.user.id,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Product reactivated successfully.",
+      data: result,
+    });
+  }),
 };

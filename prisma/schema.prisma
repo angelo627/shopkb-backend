@@ -245,6 +245,7 @@ model ActivityLog {
 
   @@index([userId])
   @@index([businessDayId])
+  @@index([action])
   @@index([entityType, entityId])
   @@index([createdAt])
 }

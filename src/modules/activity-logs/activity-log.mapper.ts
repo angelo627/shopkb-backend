@@ -1,12 +1,18 @@
 import {
   ActivityAction,
   ActivityEntity,
-  ActivityLog,
+  // ActivityLog,
+  Prisma,
 } from "@prisma/client";
 
 export interface ActivityLogResponse {
   id: string;
   userId: string;
+
+  user: {
+    id: string;
+    fullName: string;
+  };
 
   businessDayId: string | null;
 
@@ -21,11 +27,16 @@ export interface ActivityLogResponse {
 }
 
 export function toActivityLogResponse(
-  activity: ActivityLog,
+  activity: ActivityLogWithUser,
 ): ActivityLogResponse {
   return {
     id: activity.id,
     userId: activity.userId,
+
+    user: {
+      id: activity.user.id,
+      fullName: activity.user.fullName,
+    },
 
     businessDayId: activity.businessDayId,
 
@@ -57,12 +68,32 @@ export const activityDescription = {
     return `Restored product "${name}".`;
   },
 
+  productDeactivated(name: string) {
+    return `Deactivated product "${name}".`;
+  },
+
+  // productActivated(name: string) {
+  //   return `Activated product "${name}".`;
+  // },
+
+  productReactivated(name: string) {
+    return `Reactivated product "${name}".`;
+  },
+
   stockReceived(name: string, quantity: number) {
     return `Received ${quantity} unit(s) of "${name}".`;
   },
 
   stockAdjusted(name: string) {
     return `Adjusted stock for "${name}".`;
+  },
+
+  stockIn(name: string, quantity: number) {
+    return `Added ${quantity} units to "${name}".`;
+  },
+
+  stockOut(name: string, quantity: number) {
+    return `Removed ${quantity} units from "${name}".`;
   },
 
   saleCreated(quantity: number, name: string) {
@@ -85,3 +116,54 @@ export const activityDescription = {
     return "User logged out.";
   },
 };
+
+export interface GetActivityLogsInput {
+  page?: number;
+  limit?: number;
+
+  userId?: string;
+
+  businessDayId?: string;
+
+  action?: ActivityAction;
+
+  entityType?: ActivityEntity;
+
+  entityId?: string;
+
+  from?: Date;
+
+  to?: Date;
+
+  search?: string;
+
+  order?: "asc" | "desc";
+}
+
+export interface ActivityLogPagination {
+  page: number;
+
+  limit: number;
+
+  total: number;
+
+  totalPages: number;
+}
+
+export interface ActivityLogsResponse {
+  activities: ActivityLogResponse[];
+
+  pagination: ActivityLogPagination;
+}
+
+type ActivityLogWithUser = Prisma.ActivityLogGetPayload<{
+  include: {
+    user: {
+      select: {
+        id: true;
+        fullName: true;
+      };
+    };
+    // businessDay: true;
+  };
+}>;
