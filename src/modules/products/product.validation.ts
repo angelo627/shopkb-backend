@@ -14,11 +14,7 @@ export const createProductSchema = z.object({
 });
 
 export const getProductsSchema = z.object({
-  page: z.coerce
-    .number()
-    .int()
-    .min(1, "Page must be at least 1.")
-    .optional(),
+  page: z.coerce.number().int().min(1, "Page must be at least 1.").optional(),
 
   limit: z.coerce
     .number()
@@ -27,15 +23,9 @@ export const getProductsSchema = z.object({
     .max(100, "Limit cannot exceed 100.")
     .optional(),
 
-  search: z
-    .string()
-    .trim()
-    .min(1)
-    .optional(),
+  search: z.string().trim().min(1).optional(),
 
-  status: z
-    .nativeEnum(ProductStatus)
-    .optional(),
+  status: z.nativeEnum(ProductStatus).optional(),
 });
 
 export const getProductByIdSchema = z.object({
@@ -55,9 +45,34 @@ export const updateProductSchema = z.object({
 
   sellingPrice: z.coerce.number().nonnegative().optional(),
 
-  minimumStock: z.coerce
+  minimumStock: z.coerce.number().int().nonnegative().optional(),
+});
+
+export const receiveStockSchema = z.object({
+  quantity: z.coerce
     .number()
     .int()
-    .nonnegative()
-    .optional(),
+    .positive("Quantity must be greater than zero."),
+
+  notes: z.string().trim().optional(),
+});
+
+export const removeStockSchema = z.object({
+  quantity: z.coerce
+    .number()
+    .int()
+    .positive("Quantity must be greater than zero."),
+
+  notes: z.string().trim().optional(),
+});
+
+export const adjustStockSchema = z.object({
+  quantity: z.coerce
+    .number()
+    .int()
+    .refine((value) => value !== 0, {
+      message: "Adjustment quantity cannot be zero.",
+    }),
+
+  notes: z.string().max(500).optional(),
 });

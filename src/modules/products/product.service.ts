@@ -16,6 +16,11 @@ import { activityLogService } from "../activity-logs/activity-log.service";
 import { activityDescription } from "../activity-logs/activity-log.mapper";
 import { BusinessDayStatus } from "@prisma/client";
 import { businessDayService } from "../businessDay/business-day.service";
+import {
+  MovementType,
+  MovementReason,
+} from "@prisma/client";
+import { stockMovementService } from "../stockMovement/stock-movement.service";
 
 export interface CreateProductInput {
   name: string;
@@ -54,6 +59,21 @@ export interface UpdateProductInput {
   costPrice?: number;
   sellingPrice?: number;
   minimumStock?: number;
+}
+
+export interface ReceiveStockInput {
+  quantity: number;
+  notes?: string | undefined;
+}
+
+export interface RemoveStockInput {
+  quantity: number;
+  notes?: string | undefined;
+}
+
+export interface AdjustStockInput {
+  quantity: number;
+  notes?: string | undefined;
 }
 
 export interface ProductActionContext {
@@ -221,6 +241,23 @@ export const productService = {
         },
       });
 
+      if (stockQuantity > 0) {
+        await stockMovementService.createMovement(
+          {
+            productId: product.id,
+            userId: context.userId,
+            businessDayId: businessDay.id,
+
+            movementType: MovementType.IN,
+            reason: MovementReason.STOCK_RECEIVED,
+
+            quantity: stockQuantity,
+            notes: "Initial stock received when product was created.",
+          },
+          tx,
+        );
+      }
+
       await activityLogService.createActivity(
         {
           userId: context.userId,
@@ -313,7 +350,9 @@ export const productService = {
     });
 
     if (!product) {
-      throw new AppError(404, "Product not found.", "PRODUCT_NOT_FOUND");
+      throw new AppError(
+        404, "Product not found.", "PRODUCT_NOT_FOUND"
+      );
     }
 
     return toProductDetailResponse(product);
@@ -485,7 +524,11 @@ export const productService = {
     });
 
     if (!product) {
-      throw new AppError(404, "Product not found.", "PRODUCT_NOT_FOUND");
+      throw new AppError(
+        404, 
+        "Product not found.",
+        "PRODUCT_NOT_FOUND",
+      );
     }
 
     // Idempotent: already inactive
@@ -575,6 +618,277 @@ export const productService = {
           entityId: updated.id,
 
           description: activityDescription.productReactivated(updated.name),
+        },
+        tx,
+      );
+
+      return updated;
+    });
+
+    return toProductDetailResponse(updatedProduct);
+  },
+
+  async receiveStock(
+    productId: string,
+    context: ProductActionContext,
+    input: ReceiveStockInput,
+  ): Promise<ProductDetailResponse> {
+    if (input.quantity <= 0) {
+      throw new AppError(
+        400,
+        "Quantity must be greater than zero.",
+        "INVALID_QUANTITY",
+      );
+    }
+
+    const businessDay = await businessDayService.requireOpenBusinessDay();
+
+    const product = await prisma.product.findFirst({
+      where: {
+        id: productId,
+        deletedAt: null,
+      },
+    });
+
+    if (!product) {
+      throw new AppError(404, "Product not found.", "PRODUCT_NOT_FOUND");
+    }
+
+    const notes = input.notes?.trim() || null;
+
+    const updatedProduct = await prisma.$transaction(async (tx) => {
+      const newStockQuantity = product.stockQuantity + input.quantity;
+
+      const updated = await tx.product.update({
+        where: {
+          id: product.id,
+        },
+        data: {
+          stockQuantity: newStockQuantity,
+          status: determineProductStatus(newStockQuantity),
+        },
+      });
+
+      await stockMovementService.createMovement(
+        {
+          productId: product.id,
+
+          userId: context.userId,
+
+          businessDayId: businessDay.id,
+
+          movementType: MovementType.IN,
+
+          reason: MovementReason.STOCK_RECEIVED,
+
+          quantity: input.quantity,
+
+          notes,
+        },
+        tx,
+      );
+
+      await activityLogService.createActivity(
+        {
+          userId: context.userId,
+
+          businessDayId: businessDay.id,
+
+          action: ActivityAction.STOCK_RECEIVED,
+
+          entityType: ActivityEntity.PRODUCT,
+
+          entityId: updated.id,
+
+          description: activityDescription.stockReceived(
+            updated.name,
+            input.quantity,
+          ),
+        },
+        tx,
+      );
+
+      return updated;
+    });
+
+    return toProductDetailResponse(updatedProduct);
+  },
+
+  async removeStock(
+    productId: string,
+    context: ProductActionContext,
+    input: RemoveStockInput,
+  ): Promise<ProductDetailResponse> {
+    if (input.quantity <= 0) {
+      throw new AppError(
+        400,
+        "Quantity must be greater than zero.",
+        "INVALID_QUANTITY",
+      );
+    }
+
+    const businessDay = await businessDayService.requireOpenBusinessDay();
+
+    const product = await prisma.product.findFirst({
+      where: {
+        id: productId,
+        deletedAt: null,
+      },
+    });
+
+    if (!product) {
+      throw new AppError(404, "Product not found.", "PRODUCT_NOT_FOUND");
+    }
+
+    // Prevent stock from going below zero
+    if (input.quantity > product.stockQuantity) {
+      throw new AppError(
+        400,
+        "Cannot remove more stock than is available.",
+        "INSUFFICIENT_STOCK",
+      );
+    }
+
+    const notes = input.notes?.trim() || null;
+
+    const updatedProduct = await prisma.$transaction(async (tx) => {
+      const newStockQuantity = product.stockQuantity - input.quantity;
+
+      const updated = await tx.product.update({
+        where: {
+          id: product.id,
+        },
+        data: {
+          stockQuantity: newStockQuantity,
+          status: determineProductStatus(newStockQuantity),
+        },
+      });
+
+      await stockMovementService.createMovement(
+        {
+          productId: product.id,
+
+          userId: context.userId,
+
+          businessDayId: businessDay.id,
+
+          movementType: MovementType.OUT,
+
+          reason: MovementReason.ADJUSTMENT,
+
+          quantity: input.quantity,
+
+          notes,
+        },
+        tx,
+      );
+
+      await activityLogService.createActivity(
+        {
+          userId: context.userId,
+
+          businessDayId: businessDay.id,
+
+          action: ActivityAction.STOCK_REMOVED,
+
+          entityType: ActivityEntity.PRODUCT,
+
+          entityId: updated.id,
+
+          description: activityDescription.stockOut(
+            updated.name,
+            input.quantity,
+          ),
+        },
+        tx,
+      );
+
+      return updated;
+    });
+
+    return toProductDetailResponse(updatedProduct);
+  },
+
+  async adjustStock(
+    productId: string,
+    context: ProductActionContext,
+    input: AdjustStockInput,
+  ): Promise<ProductDetailResponse> {
+    if (input.quantity === 0) {
+      throw new AppError(
+        400,
+        "Adjustment quantity cannot be zero.",
+        "INVALID_ADJUSTMENT_QUANTITY",
+      );
+    }
+
+    const businessDay = await businessDayService.requireOpenBusinessDay();
+
+    const product = await prisma.product.findFirst({
+      where: {
+        id: productId,
+        deletedAt: null,
+      },
+    });
+
+    if (!product) {
+      throw new AppError(404, "Product not found.", "PRODUCT_NOT_FOUND");
+    }
+
+    // Prevent stock from becoming negative
+    const newStockQuantity = product.stockQuantity + input.quantity;
+
+    if (newStockQuantity < 0) {
+      throw new AppError(
+        400,
+        "INSUFFICIENT_STOCK",
+        "Adjustment would make stock quantity negative.",
+      );
+    }
+
+    const notes = input.notes?.trim() || null;
+
+    const updatedProduct = await prisma.$transaction(async (tx) => {
+      const updated = await tx.product.update({
+        where: {
+          id: product.id,
+        },
+        data: {
+          stockQuantity: newStockQuantity,
+          status: determineProductStatus(newStockQuantity),
+        },
+      });
+
+      await stockMovementService.createMovement(
+        {
+          productId: product.id,
+          userId: context.userId,
+          businessDayId: businessDay.id,
+
+          movementType: input.quantity > 0 ? MovementType.IN : MovementType.OUT,
+
+          reason: MovementReason.ADJUSTMENT,
+
+          quantity: Math.abs(input.quantity),
+
+          notes,
+        },
+        tx,
+      );
+
+      await activityLogService.createActivity(
+        {
+          userId: context.userId,
+
+          businessDayId: businessDay.id,
+
+          action: ActivityAction.STOCK_ADJUSTED,
+
+          entityType: ActivityEntity.PRODUCT,
+
+          entityId: updated.id,
+
+          description: activityDescription.stockAdjusted(updated.name),
         },
         tx,
       );

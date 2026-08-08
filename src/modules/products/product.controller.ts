@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { asyncHandler } from "../../shared/utils/async-handler";
 import { productService } from "./product.service";
-import { getProductsSchema } from "./product.validation";
+import { getProductsSchema, receiveStockSchema } from "./product.validation";
 import { AppError } from "../../shared/errors/app-error";
 
 export const productController = {
@@ -144,6 +144,100 @@ export const productController = {
     res.status(200).json({
       success: true,
       message: "Product reactivated successfully.",
+      data: result,
+    });
+  }),
+
+  receiveStock: asyncHandler(async (req, res) => {
+    if (!req.user) {
+      throw new AppError(
+        401,
+        "Authenticated user not found.",
+        "UNAUTHENTICATED",
+      );
+    }
+
+    const productId = req.params.id;
+
+    if (!productId || Array.isArray(productId)) {
+      throw new AppError(
+        400,
+        "Invalid or missing product ID.",
+        "INVALID_PRODUCT_ID",
+      );
+    }
+
+    const result = await productService.receiveStock(
+      productId,
+      {
+        userId: req.user.id,
+      },
+      req.body,
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Stock received successfully.",
+      data: result,
+    });
+  }),
+
+  removeStock: asyncHandler(async (req, res) => {
+    if (!req.user) {
+      throw new AppError(
+        401,
+        "Authenticated user not found.",
+        "UNAUTHENTICATED",
+      );
+    }
+
+    const productId = req.params.id;
+
+    if (!productId || Array.isArray(productId)) {
+      throw new AppError(
+        400,
+        "Invalid or missing productId parameter.",
+        "INVALID_PRODUCT_ID",
+      );
+    }
+
+    const result = await productService.removeStock(
+      productId,
+      {
+        userId: req.user.id,
+      },
+      req.body,
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Stock removed successfully.",
+      data: result,
+    });
+  }),
+
+  adjustStock: asyncHandler(async (req: Request, res: Response) => {
+    if (!req.user) {
+      throw new AppError(
+        401,
+        "Authenticated user not found.",
+        "UNAUTHENTICATED",
+      );
+    }
+
+    const { id } = req.params as { id: string };
+
+    const result = await productService.adjustStock(
+      id,
+      {
+        userId: req.user.id,
+      },
+      req.body,
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Stock adjusted successfully.",
       data: result,
     });
   }),

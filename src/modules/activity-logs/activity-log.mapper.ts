@@ -72,10 +72,6 @@ export const activityDescription = {
     return `Deactivated product "${name}".`;
   },
 
-  // productActivated(name: string) {
-  //   return `Activated product "${name}".`;
-  // },
-
   productReactivated(name: string) {
     return `Reactivated product "${name}".`;
   },

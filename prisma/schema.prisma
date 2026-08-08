@@ -8,9 +8,9 @@ datasource db {
 }
 
 enum UserRole {
- ADMIN
- SUPERADMIN
- STAFF
+  ADMIN
+  SUPERADMIN
+  STAFF
 }
 
 enum UserStatus {
@@ -21,8 +21,8 @@ enum UserStatus {
 }
 
 enum BusinessDayStatus {
- OPEN
- CLOSED
+  OPEN
+  CLOSED
 }
 
 enum ProductStatus {
@@ -32,14 +32,20 @@ enum ProductStatus {
 }
 
 enum MovementType {
- IN
- OUT
+  IN
+  OUT
 }
 
 enum MovementReason {
- STOCK_RECEIVED
- SALE
- ADJUSTMENT
+  STOCK_RECEIVED
+  SALE
+  SALE_CANCELLED
+  ADJUSTMENT
+}
+
+enum SaleStatus {
+  COMPLETED
+  CANCELLED
 }
 
 enum ActivityAction {
@@ -76,162 +82,171 @@ enum ActivityEntity {
 }
 
 model User {
- id           String   @id @default(uuid())
- fullName     String
- email        String   @unique
- passwordHash String
+  id           String @id @default(uuid())
+  fullName     String
+  email        String @unique
+  passwordHash String
 
- role         UserRole
- status       UserStatus @default(PENDING)
+  role   UserRole
+  status UserStatus @default(PENDING)
 
- sessions     Session[]
+  sessions Session[]
 
- sales        Sale[]
- movements    StockMovement[]
- activities   ActivityLog[]
+  sales      Sale[]
+  movements  StockMovement[]
+  activities ActivityLog[]
 
- openedDays   BusinessDay[] @relation("OpenedBy")
- closedDays   BusinessDay[] @relation("ClosedBy")
+  openedDays BusinessDay[] @relation("OpenedBy")
+  closedDays BusinessDay[] @relation("ClosedBy")
 
- createdAt    DateTime @default(now())
- updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Session {
-  id                 String   @id @default(uuid())
+  id String @id @default(uuid())
 
-  userId             String
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  refreshTokenHash   String
+  refreshTokenHash String
 
-  tokenVersion       Int      @default(1)
+  tokenVersion Int @default(1)
 
-  expiresAt          DateTime
+  expiresAt DateTime
 
-  lastUsedAt         DateTime?
+  lastUsedAt DateTime?
 
-  revokedAt          DateTime?
+  revokedAt DateTime?
 
-  ipAddress          String?
+  ipAddress String?
 
-  userAgent          String?
+  userAgent String?
 
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@index([expiresAt])
 }
 
 model Product {
- id            String   @id @default(uuid())
+  id String @id @default(uuid())
 
- name          String
- sku           String   @unique
- description   String?
- imageUrl      String?
- imagePublicId String?
+  name          String
+  sku           String  @unique
+  description   String?
+  imageUrl      String?
+  imagePublicId String?
 
- costPrice     Decimal  @db.Decimal(12,2)
- sellingPrice  Decimal  @db.Decimal(12, 2)
+  costPrice    Decimal @db.Decimal(12, 2)
+  sellingPrice Decimal @db.Decimal(12, 2)
 
- stockQuantity Int      @default(0)
- minimumStock  Int      @default(0)
+  stockQuantity Int @default(0)
+  minimumStock  Int @default(0)
 
- status        ProductStatus @default(AVAILABLE)
+  status ProductStatus @default(AVAILABLE)
 
- sales         Sale[]
- movements     StockMovement[]
+  sales     Sale[]
+  movements StockMovement[]
 
- createdAt     DateTime @default(now())
- updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
- deletedAt     DateTime?
+  deletedAt DateTime?
 }
 
 model BusinessDay {
- id            String @id @default(uuid())
+  id String @id @default(uuid())
 
- businessDate  DateTime @unique
+  businessDate DateTime @unique
 
- status        BusinessDayStatus @default(OPEN)
+  status BusinessDayStatus @default(OPEN)
 
- openedById    String?
- openedBy      User? @relation("OpenedBy", fields: [openedById], references: [id])
+  openedById String?
+  openedBy   User?   @relation("OpenedBy", fields: [openedById], references: [id])
 
- closedById    String?
- closedBy      User? @relation("ClosedBy", fields: [closedById], references: [id])
+  closedById String?
+  closedBy   User?   @relation("ClosedBy", fields: [closedById], references: [id])
 
- sales         Sale[]
- movements     StockMovement[]
- activities    ActivityLog[]
+  sales      Sale[]
+  movements  StockMovement[]
+  activities ActivityLog[]
 
- openedAt      DateTime @default(now())
- closedAt      DateTime?
+  openedAt DateTime  @default(now())
+  closedAt DateTime?
 
- createdAt     DateTime @default(now())
- updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Sale {
- id             String @id @default(uuid())
+  id String @id @default(uuid())
 
- productId      String
- product        Product @relation(fields: [productId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
 
- soldById       String
- soldBy         User @relation(fields: [soldById], references: [id])
+  soldById String
+  soldBy   User   @relation(fields: [soldById], references: [id])
 
- businessDayId  String
- businessDay    BusinessDay @relation(fields: [businessDayId], references: [id])
+  businessDayId String
+  businessDay   BusinessDay @relation(fields: [businessDayId], references: [id])
 
- quantity       Int
+  status SaleStatus @default(COMPLETED)
 
- unitPrice      Decimal @db.Decimal(12, 2)
+  quantity Int
 
- totalAmount    Decimal @db.Decimal(12, 2)
+  unitPrice Decimal @db.Decimal(12, 2)
 
- createdAt      DateTime @default(now())
+  totalAmount Decimal @db.Decimal(12, 2)
 
- @@index([businessDayId])
- @@index([productId])
+  stockMovements StockMovement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([businessDayId])
+  @@index([productId])
+  @@index([status])
 }
 
 model StockMovement {
- id             String @id @default(uuid())
+  id String @id @default(uuid())
 
- productId      String
- product        Product @relation(fields: [productId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
 
- userId         String
- user           User @relation(fields: [userId], references: [id])
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
- businessDayId  String
- businessDay    BusinessDay @relation(fields: [businessDayId], references: [id])
+  businessDayId String
+  businessDay   BusinessDay @relation(fields: [businessDayId], references: [id])
 
- movementType   MovementType
+  saleId String?
+  sale   Sale?   @relation(fields: [saleId], references: [id])
 
- reason         MovementReason
+  movementType MovementType
 
- quantity       Int
+  reason MovementReason
 
- notes          String?
+  quantity Int
 
- createdAt      DateTime @default(now())
+  notes String?
 
- @@index([businessDayId])
- @@index([productId])
+  createdAt DateTime @default(now())
+
+  @@index([businessDayId])
+  @@index([productId])
 }
 
 model ActivityLog {
-  id     String @id @default(uuid())
+  id String @id @default(uuid())
 
   userId String
-  user   User @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
 
   businessDayId String?
-  businessDay BusinessDay?  @relation(fields: [businessDayId], references: [id])
+  businessDay   BusinessDay? @relation(fields: [businessDayId], references: [id])
 
   action ActivityAction
 

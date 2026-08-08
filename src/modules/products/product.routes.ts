@@ -2,15 +2,19 @@ import { Router } from "express";
 import { productController } from "./product.controller";
 import { uploadProductImage } from "../../middlewares/upload.middleware";
 import { validateRequest } from "../../shared/validation/validate-request";
-import { createProductSchema } from "../products/product.validation";
-import { getProductsSchema,
-         getProductByIdSchema,
-         updateProductSchema
+import {
+  getProductsSchema,
+  getProductByIdSchema,
+  updateProductSchema,
+  receiveStockSchema,
+  createProductSchema,
+  removeStockSchema,
+  adjustStockSchema,
 } from "../products/product.validation";
 
 export const productRouter = Router();
 export const adminProductRouter = Router();
-// export const superAdminProductRouter = Router();  , eventually i will create this 
+// export const superAdminProductRouter = Router();  , eventually i will use this 
 
 // ADMIN & SUPERADMIN
 adminProductRouter.post("/createproducts",
@@ -43,6 +47,24 @@ adminProductRouter.patch(
   "/:id/reactivate",
   validateRequest(getProductByIdSchema, "params"),
   productController.reactivateProduct,
+);
+
+adminProductRouter.patch(
+  "/products/:id/receive-stock",
+  validateRequest(receiveStockSchema),
+  productController.receiveStock,
+);
+
+adminProductRouter.patch(
+  "/products/:id/remove-stock",
+  validateRequest(removeStockSchema, "body"),
+  productController.removeStock,
+);
+
+adminProductRouter.patch(
+  "/products/:id/adjust-stock",
+  validateRequest(adjustStockSchema, "body"),
+  productController.adjustStock,
 );
     
 
