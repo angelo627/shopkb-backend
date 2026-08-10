@@ -147,7 +147,7 @@ model Product {
 
   status ProductStatus @default(AVAILABLE)
 
-  sales     Sale[]
+  saleItems SaleItem[]
   movements StockMovement[]
 
   createdAt DateTime @default(now())
@@ -183,9 +183,6 @@ model BusinessDay {
 model Sale {
   id String @id @default(uuid())
 
-  productId String
-  product   Product @relation(fields: [productId], references: [id])
-
   soldById String
   soldBy   User   @relation(fields: [soldById], references: [id])
 
@@ -194,11 +191,9 @@ model Sale {
 
   status SaleStatus @default(COMPLETED)
 
-  quantity Int
-
-  unitPrice Decimal @db.Decimal(12, 2)
-
   totalAmount Decimal @db.Decimal(12, 2)
+
+  items SaleItem[]
 
   stockMovements StockMovement[]
 
@@ -206,8 +201,28 @@ model Sale {
   updatedAt DateTime @updatedAt
 
   @@index([businessDayId])
-  @@index([productId])
   @@index([status])
+}
+
+model SaleItem {
+  id String @id @default(uuid())
+
+  saleId String
+  sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  quantity Int
+
+  unitPrice Decimal @db.Decimal(12, 2)
+
+  totalAmount Decimal @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+
+  @@index([saleId])
+  @@index([productId])
 }
 
 model StockMovement {
@@ -237,6 +252,7 @@ model StockMovement {
 
   @@index([businessDayId])
   @@index([productId])
+  @@index([saleId])
 }
 
 model ActivityLog {

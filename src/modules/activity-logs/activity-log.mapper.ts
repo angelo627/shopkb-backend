@@ -92,8 +92,8 @@ export const activityDescription = {
     return `Removed ${quantity} units from "${name}".`;
   },
 
-  saleCreated(quantity: number, name: string) {
-    return `Sold ${quantity} unit(s) of "${name}".`;
+  saleCreated(itemCount: number) {
+    return `Created sale containing ${itemCount} item(s).`;
   },
 
   businessDayOpened() {

@@ -21,6 +21,8 @@ export interface CreateStockMovementInput {
 
   businessDayId: string;
 
+  saleId?: string;
+
   movementType: MovementType;
 
   reason: MovementReason;
@@ -51,6 +53,8 @@ export const stockMovementService = {
         productId: input.productId,
         userId: input.userId,
         businessDayId: input.businessDayId,
+
+        saleId: input.saleId ?? null,
 
         movementType: input.movementType,
         reason: input.reason,
