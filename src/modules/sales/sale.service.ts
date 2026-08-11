@@ -15,9 +15,6 @@ import { AppError } from "../../shared/errors/app-error";
 import { activityLogService } from "../activity-logs/activity-log.service";
 import { activityDescription } from "../activity-logs/activity-log.mapper";
 
-// import { businessDayService } from "../businessDay/business-day.service";
-
-import { stockMovementService } from "../stockMovement/stock-movement.service";
 
 export interface CreateSaleItemInput {
   productId: string;
@@ -81,14 +78,20 @@ export const saleService = {
               );
             }
 
-            // IMPORTANT:
-            // Products are fetched INSIDE the transaction.
+            // Fetch all requested products inside the transaction
             const products = await tx.product.findMany({
               where: {
                 id: {
                   in: productIds,
                 },
                 deletedAt: null,
+              },
+              select: {
+                id: true,
+                name: true,
+                sellingPrice: true,
+                stockQuantity: true,
+                status: true,
               },
             });
 
@@ -101,13 +104,24 @@ export const saleService = {
               );
             }
 
+            // Create a Map for fast product lookup
+            const productMap = new Map(
+              products.map((product) => [product.id, product]),
+            );
+
             let totalAmount = new Prisma.Decimal(0);
 
             // Validate products and calculate total
             for (const item of items) {
-              const product = products.find(
-                (product) => product.id === item.productId,
-              )!;
+              const product = productMap.get(item.productId);
+
+              if (!product) {
+                throw new AppError(
+                  404,
+                  "Product not found.",
+                  "PRODUCT_NOT_FOUND",
+                );
+              }
 
               if (product.status === ProductStatus.INACTIVE) {
                 throw new AppError(
@@ -143,71 +157,100 @@ export const saleService = {
               },
             });
 
-            // Process every product
-            for (const item of items) {
-              const product = products.find(
-                (product) => product.id === item.productId,
-              )!;
+            // CREATE ALL SALE ITEMS IN ONE DATABASE OPERATION
+            const saleItemData = items.map((item) => {
+              const product = productMap.get(item.productId)!;
 
               const itemTotal = product.sellingPrice.mul(item.quantity);
 
-              const newStockQuantity = product.stockQuantity - item.quantity;
+              return {
+                saleId: createdSale.id,
 
-              // Create SaleItem
-              await tx.saleItem.create({
-                data: {
-                  saleId: createdSale.id,
+                productId: product.id,
 
-                  productId: product.id,
+                quantity: item.quantity,
 
-                  quantity: item.quantity,
+                unitPrice: product.sellingPrice,
 
-                  unitPrice: product.sellingPrice,
+                totalAmount: itemTotal,
+              };
+            });
 
-                  totalAmount: itemTotal,
-                },
-              });
+            await tx.saleItem.createMany({
+              data: saleItemData,
+            });
 
-              // Update stock
-              await tx.product.update({
-                where: {
-                  id: product.id,
-                },
+            // UPDATE ALL PRODUCT STOCK IN ONE DATABASE OPERATION
+            const stockUpdates = items.map(
+              (item) =>
+                Prisma.sql`(${item.productId}, ${item.quantity}::integer)`,
+            );
 
-                data: {
-                  stockQuantity: newStockQuantity,
+            const updatedProducts = await tx.$executeRaw(
+              Prisma.sql`
+               WITH requested(product_id, quantity) AS (
+                 VALUES ${Prisma.join(stockUpdates)}
+               )
+               UPDATE "Product" AS p
+               SET
+                 "stockQuantity" = p."stockQuantity" - requested.quantity,
+           
+                 "status" = CASE
+                   WHEN p."stockQuantity" - requested.quantity > 0
+                     THEN 'AVAILABLE'::"ProductStatus"
+           
+                   ELSE 'OUT_OF_STOCK'::"ProductStatus"
+                 END
+           
+               FROM requested
+           
+               WHERE p."id" = requested.product_id
+           
+                 AND p."deletedAt" IS NULL
+           
+                 AND p."status" <> 'INACTIVE'::"ProductStatus"
+           
+                 AND p."stockQuantity" >= requested.quantity
+             `,
+            );
 
-                  status:
-                    newStockQuantity > 0
-                      ? ProductStatus.AVAILABLE
-                      : ProductStatus.OUT_OF_STOCK,
-                },
-              });
-
-              // Record stock movement
-              await stockMovementService.createMovement(
-                {
-                  productId: product.id,
-
-                  userId: context.userId,
-
-                  businessDayId: businessDay.id,
-
-                  saleId: createdSale.id,
-
-                  movementType: MovementType.OUT,
-
-                  reason: MovementReason.SALE,
-
-                  quantity: item.quantity,
-
-                  notes: `Sale ${createdSale.id}.`,
-                },
-                tx,
+            // Make sure every requested product was updated
+            if (updatedProducts !== items.length) {
+              throw new AppError(
+                400,
+                "One or more products do not have enough stock or cannot be sold.",
+                "STOCK_UPDATE_FAILED",
               );
             }
 
-            // Record one activity for the sale
+            // CREATE ALL STOCK MOVEMENTS IN ONE DATABASE OPERATION
+            const movementData = items.map((item) => {
+              const product = productMap.get(item.productId)!;
+
+              return {
+                productId: product.id,
+
+                userId: context.userId,
+
+                businessDayId: businessDay.id,
+
+                saleId: createdSale.id,
+
+                movementType: MovementType.OUT,
+
+                reason: MovementReason.SALE,
+
+                quantity: item.quantity,
+
+                notes: `Sale ${createdSale.id}.`,
+              };
+            });
+
+            await tx.stockMovement.createMany({
+              data: movementData,
+            });
+
+            // RECORD ONE ACTIVITY FOR THE ENTIRE SALE
             await activityLogService.createActivity(
               {
                 userId: context.userId,
@@ -229,16 +272,24 @@ export const saleService = {
           },
           {
             isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+
             timeout: 10000,
           },
         );
 
         return sale;
       } catch (error) {
-        // PostgreSQL/Prisma serialization conflict
-        if (
+        const isPrismaSerializationConflict =
           error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === "P2034" &&
+          error.code === "P2034";
+
+        const isPostgresSerializationConflict =
+          error instanceof Error &&
+          "code" in error &&
+          (error as { code?: string }).code === "40001";
+
+        if (
+          (isPrismaSerializationConflict || isPostgresSerializationConflict) &&
           attempt < maxRetries
         ) {
           continue;
