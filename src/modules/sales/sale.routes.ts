@@ -15,6 +15,12 @@ saleRouter.post(
   saleController.createSale,
 );
 
+saleRouter.get(
+  "/getsales/:id/receipt",
+  validateRequest(saleIdSchema, "params"),
+  saleController.getSaleReceipt,
+);
+
 
 adminsaleRouter.get(
   "/get-sales",

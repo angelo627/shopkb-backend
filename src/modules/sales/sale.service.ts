@@ -15,8 +15,28 @@ import { AppError } from "../../shared/errors/app-error";
 import { activityLogService } from "../activity-logs/activity-log.service";
 import { activityDescription } from "../activity-logs/activity-log.mapper";
 import { toSaleListResponse, SaleWithDetails, PaginatedSalesResponse } from "./sale.mapper";
-import { stockMovementService } from "../stockMovement/stock-movement.service";
-import { businessDayService } from "../businessDay/business-day.service";
+
+export interface SaleReceiptResponse {
+  saleId: string;
+  status: SaleStatus;
+  receiptDate: Date;
+
+  cashier: {
+    id: string;
+    fullName: string;
+  };
+
+  items: {
+    productId: string;
+    productName: string;
+    sku: string;
+    quantity: number;
+    unitPrice: Prisma.Decimal;
+    totalAmount: Prisma.Decimal;
+  }[];
+
+  totalAmount: Prisma.Decimal;
+}
 
 export interface CreateSaleItemInput {
   productId: string;
@@ -745,5 +765,71 @@ export const saleService = {
       "The sale could not be cancelled.",
       "SALE_CANCELLATION_CONFLICT",
     );
+  },
+
+  async getSaleReceipt(saleId: string): Promise<SaleReceiptResponse> {
+    const sale = await prisma.sale.findUnique({
+      where: {
+        id: saleId,
+      },
+
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        totalAmount: true,
+
+        soldBy: {
+          select: {
+            id: true,
+            fullName: true,
+          },
+        },
+
+        items: {
+          select: {
+            productId: true,
+            quantity: true,
+            unitPrice: true,
+            totalAmount: true,
+
+            product: {
+              select: {
+                name: true,
+                sku: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!sale) {
+      throw new AppError(404, "Sale not found.", "SALE_NOT_FOUND");
+    }
+
+    return {
+      saleId: sale.id,
+
+      status: sale.status,
+
+      receiptDate: sale.createdAt,
+
+      cashier: {
+        id: sale.soldBy.id,
+        fullName: sale.soldBy.fullName,
+      },
+
+      items: sale.items.map((item) => ({
+        productId: item.productId,
+        productName: item.product.name,
+        sku: item.product.sku,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        totalAmount: item.totalAmount,
+      })),
+
+      totalAmount: sale.totalAmount,
+    };
   },
 };

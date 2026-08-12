@@ -77,4 +77,23 @@ export const saleController = {
       next(error);
     }
   },
+
+  async getSaleReceipt(
+    req: Request<{ id: string }>,
+    res: Response,
+    next: NextFunction,
+  ) {
+    try {
+      const receipt = await saleService.getSaleReceipt(req.params.id);
+
+      return res.status(200).json({
+        success: true,
+        statusCode: 200,
+        message: "Receipt retrieved successfully.",
+        data: receipt,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 };
