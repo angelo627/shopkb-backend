@@ -15,7 +15,8 @@ import { AppError } from "../../shared/errors/app-error";
 import { activityLogService } from "../activity-logs/activity-log.service";
 import { activityDescription } from "../activity-logs/activity-log.mapper";
 import { toSaleListResponse, SaleWithDetails, PaginatedSalesResponse } from "./sale.mapper";
-
+import { stockMovementService } from "../stockMovement/stock-movement.service";
+import { businessDayService } from "../businessDay/business-day.service";
 
 export interface CreateSaleItemInput {
   productId: string;
@@ -449,5 +450,300 @@ export const saleService = {
         totalPages: Math.ceil(totalItems / limit),
       },
     };
+  },
+
+  async getSaleById(saleId: string) {
+    const sale = await prisma.sale.findUnique({
+      where: {
+        id: saleId,
+      },
+
+      include: {
+        soldBy: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+          },
+        },
+
+        //this ones i commented if its needed in the feature i will un comment it
+        // businessDay: {
+        //   select: {
+        //     id: true,
+        //     businessDate: true,
+        //     status: true,
+        //   },
+        // },
+
+        // items: {
+        //   include: {
+        //     product: {
+        //       select: {
+        //         id: true,
+        //         name: true,
+        //         sku: true,
+        //       },
+        //     },
+        //   },
+        // },
+
+        // stockMovements: {
+        //   select: {
+        //     id: true,
+        //     productId: true,
+        //     movementType: true,
+        //     reason: true,
+        //     quantity: true,
+        //     notes: true,
+        //     createdAt: true,
+        //   },
+        // },
+      },
+    });
+
+    if (!sale) {
+      throw new AppError(404, "Sale not found.", "SALE_NOT_FOUND");
+    }
+
+    return sale;
+  },
+
+  async cancelSale(saleId: string, context: { userId: string }) {
+    const maxRetries = 3;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const cancelledSale = await prisma.$transaction(
+          async (tx) => {
+            // 1. Get the sale inside the transaction
+            const sale = await tx.sale.findUnique({
+              where: {
+                id: saleId,
+              },
+              select: {
+                id: true,
+                status: true,
+
+                items: {
+                  select: {
+                    id: true,
+                    productId: true,
+                    quantity: true,
+
+                    product: {
+                      select: {
+                        id: true,
+                        stockQuantity: true,
+                      },
+                    },
+                  },
+                },
+              },
+            });
+
+            if (!sale) {
+              throw new AppError(404, "Sale not found.", "SALE_NOT_FOUND");
+            }
+
+            // 2. Make sure the sale has not already been cancelled
+            if (sale.status === SaleStatus.CANCELLED) {
+              throw new AppError(
+                409,
+                "Sale has already been cancelled.",
+                "SALE_ALREADY_CANCELLED",
+              );
+            }
+
+            // 3. Get the currently open business day
+            const businessDay = await tx.businessDay.findFirst({
+              where: {
+                status: "OPEN",
+              },
+              select: {
+                id: true,
+              },
+            });
+
+            if (!businessDay) {
+              throw new AppError(
+                404,
+                "No business day is currently open.",
+                "BUSINESS_DAY_NOT_FOUND",
+              );
+            }
+
+            // 4. Cancel the sale
+            const updatedSale = await tx.sale.updateMany({
+              where: {
+                id: sale.id,
+                status: SaleStatus.COMPLETED,
+              },
+              data: {
+                status: SaleStatus.CANCELLED,
+              },
+            });
+
+            if (updatedSale.count !== 1) {
+              throw new AppError(
+                409,
+                "Sale has already been cancelled or could not be cancelled.",
+                "SALE_CANCELLATION_CONFLICT",
+              );
+            }
+
+            // 5. Restore stock
+            if (sale.items.length > 0) {
+              const stockUpdates = sale.items.map(
+                (item) =>
+                  Prisma.sql`(
+                  ${item.productId}::text,
+                  ${item.quantity}::integer
+                )`,
+              );
+
+              const updatedProducts = await tx.$executeRaw(
+                Prisma.sql`
+                WITH requested(product_id, quantity) AS (
+                  VALUES ${Prisma.join(stockUpdates)}
+                ),
+                aggregated AS (
+                  SELECT
+                    product_id,
+                    SUM(quantity)::integer AS quantity
+                  FROM requested
+                  GROUP BY product_id
+                )
+                UPDATE "Product" AS p
+                SET
+                  "stockQuantity" =
+                    p."stockQuantity" + aggregated.quantity,
+
+                  "status" =
+                    CASE
+                      WHEN p."stockQuantity" + aggregated.quantity > 0
+                        THEN 'AVAILABLE'::"ProductStatus"
+
+                      ELSE 'OUT_OF_STOCK'::"ProductStatus"
+                    END,
+
+                  "updatedAt" = NOW()
+
+                FROM aggregated
+
+                WHERE p."id" = aggregated.product_id
+              `,
+              );
+
+              const uniqueProductIds = new Set(
+                sale.items.map((item) => item.productId),
+              );
+
+              if (updatedProducts !== uniqueProductIds.size) {
+                throw new AppError(
+                  500,
+                  "Failed to restore product stock.",
+                  "STOCK_RESTORE_FAILED",
+                );
+              }
+
+              // 6. Create stock movements in one operation
+              const movementData = sale.items.map((item) => ({
+                productId: item.productId,
+
+                userId: context.userId,
+
+                businessDayId: businessDay.id,
+
+                saleId: sale.id,
+
+                movementType: MovementType.IN,
+
+                reason: MovementReason.SALE_CANCELLED,
+
+                quantity: item.quantity,
+
+                notes: `Sale ${sale.id} cancelled.`,
+              }));
+
+              await tx.stockMovement.createMany({
+                data: movementData,
+              });
+            }
+
+            // 7. Activity log
+            await activityLogService.createActivity(
+              {
+                userId: context.userId,
+
+                businessDayId: businessDay.id,
+
+                action: ActivityAction.SALE_CANCELLED,
+
+                entityType: ActivityEntity.SALE,
+
+                entityId: sale.id,
+
+                description: `Cancelled sale "${sale.id}".`,
+              },
+              tx,
+            );
+
+            return updatedSale;
+          },
+          {
+            isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+
+            timeout: 10000,
+          },
+        );
+
+        // Transaction succeeded
+        const sale = await prisma.sale.findUnique({
+          where: {
+            id: saleId,
+          },
+        });
+
+        if (!sale) {
+          throw new AppError(
+            404,
+            "Sale not found after cancellation.",
+            "SALE_NOT_FOUND",
+          );
+        }
+
+        return sale;
+      } catch (error) {
+        // Retry serialization conflicts
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2034"
+        ) {
+          if (attempt < maxRetries) {
+            await new Promise((resolve) => setTimeout(resolve, 50 * attempt));
+
+            continue;
+          }
+
+          // All retries failed
+          throw new AppError(
+            409,
+            "The sale could not be cancelled because another transaction changed related data. Please try again.",
+            "SALE_CANCELLATION_CONFLICT",
+          );
+        }
+
+        // Normal application errors
+        throw error;
+      }
+    }
+
+    // Should never be reached
+    throw new AppError(
+      409,
+      "The sale could not be cancelled.",
+      "SALE_CANCELLATION_CONFLICT",
+    );
   },
 };
