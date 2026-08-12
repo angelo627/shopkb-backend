@@ -9,7 +9,7 @@ import {
 } from "../modules/businessDay/business-day.routes";
 import { adminActivityLogRouter } from "../modules/activity-logs/activity-log.routes";
 import { stockMovementRouter } from "../modules/stockMovement/stock-movement.routes";
-import { saleRouter } from "../modules/sales/sale.routes";
+import { saleRouter, adminsaleRouter } from "../modules/sales/sale.routes";
 
 
 const Apirouter = Router();
@@ -57,6 +57,7 @@ adminrouter.use(authorize("ADMIN", "SUPERADMIN"));
 adminrouter.use("/admin", adminProductRouter);
 adminrouter.use("/admin", adminBusinessDayRouter);
 adminrouter.use("/admin", adminActivityLogRouter);
+adminrouter.use("/admin", adminsaleRouter);
 
 
 

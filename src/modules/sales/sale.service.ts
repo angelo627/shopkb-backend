@@ -14,6 +14,7 @@ import { AppError } from "../../shared/errors/app-error";
 
 import { activityLogService } from "../activity-logs/activity-log.service";
 import { activityDescription } from "../activity-logs/activity-log.mapper";
+import { toSaleListResponse, SaleWithDetails, PaginatedSalesResponse } from "./sale.mapper";
 
 
 export interface CreateSaleItemInput {
@@ -23,6 +24,18 @@ export interface CreateSaleItemInput {
 
 export interface CreateSaleInput {
   items: CreateSaleItemInput[];
+}
+
+export interface GetSalesQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  productId?: string;
+  soldById?: string;
+  businessDayId?: string;
+  from?: string;
+  to?: string;
+  status?: SaleStatus;
 }
 
 
@@ -304,5 +317,137 @@ export const saleService = {
       "The sale could not be completed because another transaction changed the stock. Please try again.",
       "SALE_CONFLICT",
     );
+  },
+
+  async getSales(query: GetSalesQuery): Promise<PaginatedSalesResponse> {
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(100, Math.max(1, query.limit ?? 10));
+
+    const skip = (page - 1) * limit;
+
+    let fromDate: Date | undefined;
+    let toDate: Date | undefined;
+
+    if (query.from) {
+      fromDate = new Date(`${query.from}T00:00:00.000`);
+    }
+
+    if (query.to) {
+      toDate = new Date(`${query.to}T00:00:00.000`);
+
+      // Include the entire "to" date
+      toDate.setDate(toDate.getDate() + 1);
+    }
+
+    const itemFilters: Prisma.SaleItemWhereInput = {};
+
+    // Filter by product
+    if (query.productId) {
+      itemFilters.productId = query.productId;
+    }
+
+    // Partial product-name search
+    if (query.search) {
+      itemFilters.product = {
+        name: {
+          contains: query.search,
+          mode: Prisma.QueryMode.insensitive,
+        },
+      };
+    }
+
+    const where: Prisma.SaleWhereInput = {
+      ...(query.status && {
+        status: query.status,
+      }),
+
+      ...(query.soldById && {
+        soldById: query.soldById,
+      }),
+
+      ...(query.businessDayId && {
+        businessDayId: query.businessDayId,
+      }),
+
+      // Only add the items filter when product/search
+      // filtering is actually being requested.
+      ...(Object.keys(itemFilters).length > 0 && {
+        items: {
+          some: itemFilters,
+        },
+      }),
+
+      ...(fromDate || toDate
+        ? {
+            createdAt: {
+              ...(fromDate && {
+                gte: fromDate,
+              }),
+
+              ...(toDate && {
+                lt: toDate,
+              }),
+            },
+          }
+        : {}),
+    };
+
+    const [sales, totalItems] = await Promise.all([
+      prisma.sale.findMany({
+        where,
+
+        skip,
+        take: limit,
+
+        orderBy: {
+          createdAt: "desc",
+        },
+
+        include: {
+          soldBy: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+            },
+          },
+
+          businessDay: {
+            select: {
+              id: true,
+              businessDate: true,
+              status: true,
+            },
+          },
+
+          items: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  sku: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+
+      prisma.sale.count({
+        where,
+      }),
+    ]);
+
+    return {
+      items: sales.map(toSaleListResponse),
+
+      pagination: {
+        page,
+        limit,
+        totalItems,
+        totalPages: Math.ceil(totalItems / limit),
+      },
+    };
   },
 };

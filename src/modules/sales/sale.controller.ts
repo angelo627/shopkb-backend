@@ -21,4 +21,15 @@ export const saleController = {
       next(error);
     }
   },
+
+  async getSales(req: Request, res: Response) {
+    const result = await saleService.getSales(req.query);
+
+    res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: "Sales retrieved successfully.",
+      data: result,
+    });
+  },
 };
