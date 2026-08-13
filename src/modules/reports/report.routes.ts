@@ -10,3 +10,8 @@ reportRouter.get(
     reportController.getDailyReport,
 );
 
+
+reportRouter.get(
+    "/reports/weekly",
+    reportController.getWeeklyReport,
+);

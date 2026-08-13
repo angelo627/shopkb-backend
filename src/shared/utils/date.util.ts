@@ -63,3 +63,51 @@ export function getMonthRange(
     end: nextMonth,
   };
 }
+
+export function getWeekRange(date: string): {
+  start: Date;
+  end: Date;
+} {
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+
+  if (!datePattern.test(date)) {
+    throw new Error("Invalid date format.");
+  }
+
+  // Treat the calendar date as a UTC date only for
+  // calculating the weekday.
+  const calendarDate = new Date(`${date}T00:00:00Z`);
+
+  if (Number.isNaN(calendarDate.getTime())) {
+    throw new Error("Invalid date.");
+  }
+
+  // Sunday = 0, Monday = 1, ..., Saturday = 6
+  const dayOfWeek = calendarDate.getUTCDay();
+
+  // Monday = first day of the week
+  const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+
+  const startCalendarDate = new Date(calendarDate);
+
+  startCalendarDate.setUTCDate(
+    startCalendarDate.getUTCDate() - daysSinceMonday,
+  );
+
+  const startDateString = startCalendarDate.toISOString().slice(0, 10);
+
+  const start = new Date(`${startDateString}T00:00:00+01:00`);
+
+  const endCalendarDate = new Date(startCalendarDate);
+
+  endCalendarDate.setUTCDate(endCalendarDate.getUTCDate() + 7);
+
+  const endDateString = endCalendarDate.toISOString().slice(0, 10);
+
+  const end = new Date(`${endDateString}T00:00:00+01:00`);
+
+  return {
+    start,
+    end,
+  };
+}
