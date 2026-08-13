@@ -201,7 +201,7 @@ model Sale {
   updatedAt DateTime @updatedAt
 
   @@index([businessDayId])
-  @@index([status])
+  @@index([createdAt, status])
 }
 
 model SaleItem {
@@ -253,6 +253,7 @@ model StockMovement {
   @@index([businessDayId])
   @@index([productId])
   @@index([saleId])
+  @@index([createdAt, movementType, reason])
 }
 
 model ActivityLog {

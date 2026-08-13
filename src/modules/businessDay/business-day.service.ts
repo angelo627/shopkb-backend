@@ -25,17 +25,21 @@ import {
 
 import { businessDayInclude } from "./business-day.mapper";
 import { BusinessDayListResponse } from "./business-day.mapper";
+import {
+  getCurrentBusinessDate,
+  getDayRange,
+} from "../../shared/utils/date.util";
 
 export interface BusinessDayContext {
   userId: string;
 }
 
 function getBusinessDate(): Date {
-  const today = new Date();
+  const date = getCurrentBusinessDate();
 
-  today.setHours(0, 0, 0, 0);
+  const { start } = getDayRange(date);
 
-  return today;
+  return start;
 }
 
 //helper func

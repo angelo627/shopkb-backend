@@ -10,6 +10,7 @@ import {
 import { adminActivityLogRouter } from "../modules/activity-logs/activity-log.routes";
 import { stockMovementRouter } from "../modules/stockMovement/stock-movement.routes";
 import { saleRouter, adminsaleRouter } from "../modules/sales/sale.routes";
+import { reportRouter } from "../modules/reports/report.routes";
 
 
 const Apirouter = Router();
@@ -38,6 +39,7 @@ Apirouter.use("/user", productRouter);
 Apirouter.use("/user", businessDayRouter);
 Apirouter.use("/user", stockMovementRouter);
 Apirouter.use("/user", saleRouter);
+Apirouter.use("/user", reportRouter);
 
 
 
