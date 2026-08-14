@@ -15,3 +15,5 @@ reportRouter.get(
     "/reports/weekly",
     reportController.getWeeklyReport,
 );
+
+reportRouter.get("/reports/monthly", reportController.getMonthlyReport);

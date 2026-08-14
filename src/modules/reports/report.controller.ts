@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 
 import { reportService } from "./report.service";
+import { getCurrentBusinessDate } from "../../shared/utils/date.util";
 
 export const reportController = {
   async getDailyReport(req: Request, res: Response, next: NextFunction) {
@@ -35,8 +36,21 @@ export const reportController = {
 
   async getMonthlyReport(req: Request, res: Response, next: NextFunction) {
     try {
-      const year = Number(req.query.year);
-      const month = Number(req.query.month);
+      const currentBusinessDate = getCurrentBusinessDate();
+
+      const dateParts = currentBusinessDate.split("-");
+
+      const currentYear = Number(dateParts[0]);
+      const currentMonth = Number(dateParts[1]);
+
+      const yearValue = req.query.year;
+      const monthValue = req.query.month;
+
+      const year =
+        typeof yearValue === "string" ? Number(yearValue) : currentYear;
+
+      const month =
+        typeof monthValue === "string" ? Number(monthValue) : currentMonth;
 
       const report = await reportService.getMonthlyReport(
         req.user!.role,
