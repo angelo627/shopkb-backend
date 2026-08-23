@@ -15,3 +15,22 @@ export function startSessionCleanupJob(): void {
     }
   }, ONE_DAY);
 }
+
+
+
+// test code below
+// export function startSessionCleanupJob(): void {
+//   const THIRTY_SECONDS = 30 * 1000;
+
+//   setInterval(async () => {
+//     try {
+//       const deleted = await sessionService.cleanupExpiredSessions();
+
+//       console.log(
+//         `[Session Cleanup] Deleted ${deleted} expired/revoked sessions.`,
+//       );
+//     } catch (error) {
+//       console.error("[Session Cleanup]", error);
+//     }
+//   }, THIRTY_SECONDS);
+// }
