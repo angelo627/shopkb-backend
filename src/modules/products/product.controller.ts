@@ -32,9 +32,12 @@ export const productController = {
 
   getProducts: asyncHandler(async (req, res) => {
     const query = getProductsSchema.parse(req.query);
-
-    const result = await productService.getProducts(query);
-
+  
+    const result = await productService.getProducts(
+      query,
+      req.user!.role
+    );
+  
     res.status(200).json({
       success: true,
       message: "Products retrieved successfully.",

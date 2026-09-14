@@ -2,6 +2,7 @@ import { Product, ProductStatus, ActivityAction, ActivityEntity } from "@prisma/
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma-client";
 import { AppError } from "../../shared/errors/app-error";
+import { UserRole } from "../../shared/constants/auth";
 import {
   ProductDetailResponse,
   toProductDetailResponse,
@@ -283,6 +284,7 @@ export const productService = {
 
   async getProducts(
     query: GetProductsQuery,
+    role: UserRole,
   ): Promise<PaginatedProductsResponse> {
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.max(1, query.limit ?? 10);
@@ -329,8 +331,12 @@ export const productService = {
       }),
     ]);
 
+    const canViewCostPrice = role === UserRole.ADMIN || role === UserRole.SUPERADMIN;
+
     return {
-      items: products.map(toProductListResponse),
+      items: products.map((product) =>
+        toProductListResponse(product, canViewCostPrice),
+      ),
 
       pagination: {
         page,
@@ -350,9 +356,7 @@ export const productService = {
     });
 
     if (!product) {
-      throw new AppError(
-        404, "Product not found.", "PRODUCT_NOT_FOUND"
-      );
+      throw new AppError(404, "Product not found.", "PRODUCT_NOT_FOUND");
     }
 
     return toProductDetailResponse(product);
@@ -524,11 +528,7 @@ export const productService = {
     });
 
     if (!product) {
-      throw new AppError(
-        404, 
-        "Product not found.",
-        "PRODUCT_NOT_FOUND",
-      );
+      throw new AppError(404, "Product not found.", "PRODUCT_NOT_FOUND");
     }
 
     // Idempotent: already inactive

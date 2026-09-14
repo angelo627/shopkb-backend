@@ -21,6 +21,7 @@ export interface ProductListResponse {
   name: string;
   sku: string;
   imageUrl: string | null;
+  costPrice?: number;
   sellingPrice: number;
   stockQuantity: number;
   minimumStock: number;
@@ -104,12 +105,17 @@ export function toProductDetailResponse(
 }
 
 export function toProductListResponse(
-  product: Product
+  product: Product,
+  includeCostPrice: boolean,
 ): ProductListResponse {
   return {
     ...mapProductIdentityFields(product),
 
     ...mapProductMediaFields(product),
+
+    ...(includeCostPrice && {
+      costPrice: product.costPrice.toNumber(),
+    }),
 
     sellingPrice: product.sellingPrice.toNumber(),
 
