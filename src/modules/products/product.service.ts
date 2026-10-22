@@ -200,10 +200,10 @@ export const productService = {
       );
     }
 
-    if (input.sellingPrice < input.costPrice) {
+    if (input.sellingPrice <= input.costPrice) {
       throw new AppError(
         400,
-        "Selling price cannot be less than cost price.",
+        "Selling price must be higher than cost price.",
         "INVALID_SELLING_PRICE",
       );
     }
