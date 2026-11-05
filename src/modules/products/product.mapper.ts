@@ -20,6 +20,7 @@ export interface ProductListResponse {
   id: string;
   name: string;
   sku: string;
+  description: string | null;
   imageUrl: string | null;
   costPrice?: number;
   sellingPrice: number;
@@ -112,6 +113,8 @@ export function toProductListResponse(
     ...mapProductIdentityFields(product),
 
     ...mapProductMediaFields(product),
+
+    description: product.description,
 
     ...(includeCostPrice && {
       costPrice: product.costPrice.toNumber(),
